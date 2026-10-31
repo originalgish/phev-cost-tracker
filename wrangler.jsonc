@@ -14,15 +14,14 @@
   },
   "d1_databases": [
     {
-      "binding": "DB",
+      "binding": "phev_cost_tracker",
       "database_name": "phev-cost-tracker",
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
+      "database_id": "29fd241a-0450-4c23-9bd1-acfad9781b1d"
     }
   ],
   "vars": {
-    "ACCESS_TEAM_DOMAIN": "https://REPLACE-ME.cloudflareaccess.com",
-    "ACCESS_AUD": "REPLACE-ME",
+    "ACCESS_TEAM_DOMAIN": "https://white-morning-ac7b.cloudflareaccess.com",
+    "ACCESS_AUD": "fae5d85de660945cac9a6990ba973fc458562821502fa3b4ea8d22a836c18ead",
     "TIMEZONE": "Europe/Helsinki"
   }
 }
