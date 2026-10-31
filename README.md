@@ -13,14 +13,14 @@ The tracker polls the Škoda Connect API, turns the car's readings into charge s
 3. **At home.** The parked position is compared with the home position captured once at setup, within 50 m. If the car reports no position, the last known value carries over while it stays plugged in; otherwise it is unknown.
 4. **Session.** A session opens when the car is plugged in, charging and at home. It closes on unplug, when charging ends, or after 180 minutes of silence. Charges away from home are ignored.
 5. **Energy.** Each session gets two estimates: integrated charge power, and the change in SoC times usable battery size. Billed energy uses the power estimate and falls back to SoC if that has gaps.
-6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config.ts](src/config.ts); a price change is a code change followed by **Recompute all costs**.
+6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config.ts](src/config.ts). Costs are stored when a session closes, so a price change is a code change that applies to new sessions.
 7. **Alerts.** Optional webhook, for example ntfy.sh. Sent for a key expiring within 14 days, three auth or rate-limit failures in a row, or no successful poll for 6 hours. Each kind is sent at most once a day.
 
 ## Architecture
 
 - **Worker** in TypeScript with [Hono](https://hono.dev): `fetch` serves the API and dashboard, `scheduled` runs the poll.
 - **D1** (SQLite) stores snapshots, sessions, the latest car state, the home position, poll state, errors and alert log. Schema: [migrations/](migrations/).
-- **Dashboard** is a static page in [public/](public/) with Chart.js: current car state, monthly cost, session list and data health. Its files are served with a Content-Security-Policy limited to the page's own origin.
+- **Dashboard** is two static pages in [public/](public/): current car state, monthly cost and the session list with Chart.js on `/`, and data health on `/health`. Their files are served with a Content-Security-Policy limited to the page's own origin.
 - **Access**: Cloudflare Access covers all traffic to the Worker. The Worker also verifies the Access JWT on `/api/*` and `/setup/*`.
 - **Free tier**: built for Workers and D1 free-tier limits, including 10 ms of CPU per invocation. CPU time is checked after deployment.
 
@@ -73,6 +73,17 @@ pnpm check:specs 4   # also require a test for every requirement up to phase 4
 
 Behaviour changes follow [specs/README.md](specs/README.md): spec, then a failing test with the requirement ID in its title, then code, then `pnpm check`, then one commit.
 
+## Maintenance
+
+These routes have no buttons. To call one, log in to the dashboard, open the browser console and run:
+
+```js
+await fetch("/setup/home", { method: "POST", headers: { "Content-Type": "application/json" } }).then((r) => r.json());
+```
+
+- `/setup/home` stores the car's current parked position as home. Run it once at setup, with the car parked at home. Add `?force=1` to replace a stored position.
+- `/api/sessions/recompute-cost` applies the current price and battery size to every closed session, so use it only to correct a wrong constant. After a contract change it would reprice past sessions at the new price.
+
 ## Deploy
 
 `main` is protected: every change arrives through a pull request that the owner merges, on a branch that is up to date and has a passing `check`. Direct pushes, force-pushes and deleting `main` are blocked, for the owner too.
@@ -105,7 +116,7 @@ This needs a Cloudflare account with Zero Trust enabled and the MyŠkoda app, ve
 4. Deploy with `pnpm run deploy`. Plain `pnpm deploy` is pnpm's own command, not this script.
 5. In the Cloudflare dashboard, open the Worker's **Access** tab and select **Protect this Worker behind Access**. Choose **All traffic** and allow only your own email address.
 6. In **Zero Trust**, find the app under **Access** and **Applications**. Put its Application Audience (AUD) tag and your team domain into `vars` in `wrangler.jsonc`, then deploy again. These values and the `database_id` are identifiers, not secrets, but they are public in this repository.
-7. Open the Worker's URL in a private window and confirm the Access login appears. After logging in, with the car parked at home, select **Capture home position**.
+7. Open the Worker's URL in a private window and confirm the Access login appears. After logging in, with the car parked at home, run the `/setup/home` call from [Maintenance](#maintenance).
 8. Set your own price and battery size in [src/config.ts](src/config.ts), and add a calendar reminder for the API key's expiry date.
 
 ## Documentation

@@ -1,13 +1,13 @@
+import { $, api, cells, emptyRow, run, when } from "./common.js";
+
 const DAY = 86400;
 const HOUR = 3600;
 const CHART_MONTHS = 12;
 
-const $ = (id) => document.getElementById(id);
 const now = () => Math.floor(Date.now() / 1000);
 
 const euros = (c) => (c === null ? "—" : (c / 100).toFixed(2));
 const kwh = (v) => (v === null ? "—" : v.toFixed(2));
-const when = (sec) => (sec === null ? "—" : new Date(sec * 1000).toLocaleString());
 
 function duration(sec) {
   const minutes = Math.max(0, Math.round(sec / 60));
@@ -19,58 +19,6 @@ let health = null;
 let monthRows = [];
 let selectedMonth = null;
 let chart = null;
-
-async function api(path, { method = "GET", body } = {}) {
-  const init = { method, headers: {} };
-  if (method !== "GET") init.headers["Content-Type"] = "application/json";
-  if (body !== undefined) init.body = JSON.stringify(body);
-  let res;
-  try {
-    res = await fetch(path, init);
-  } catch {
-    throw new Error("Network error. Check the connection and try again.");
-  }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Request failed with HTTP ${res.status}`);
-  return data;
-}
-
-function showMessage(text, isError = false) {
-  const status = $("status");
-  status.textContent = text;
-  status.className = isError ? "error" : "";
-  status.hidden = false;
-  // The message sits at the top, so bring it into view when the user is further down the page.
-  status.scrollIntoView({ block: "nearest" });
-}
-
-async function run(task) {
-  try {
-    await task();
-  } catch (err) {
-    showMessage(err.message, true);
-  }
-}
-
-function cells(values, className) {
-  const tr = document.createElement("tr");
-  if (className) tr.className = className;
-  for (const value of values) {
-    const td = document.createElement("td");
-    td.textContent = value;
-    tr.append(td);
-  }
-  return tr;
-}
-
-function emptyRow(text, span) {
-  const tr = document.createElement("tr");
-  const td = document.createElement("td");
-  td.colSpan = span;
-  td.textContent = text;
-  tr.append(td);
-  return tr;
-}
 
 function renderBanners() {
   const lines = [];
@@ -124,16 +72,6 @@ function renderCar(car) {
   $("car-odometer").textContent = withUnit(car.odometer?.km?.toLocaleString(), "km");
   const newest = Math.max(0, ...parts.map((p) => p.captured_at ?? 0));
   $("car-updated").textContent = newest > 0 ? `Updated ${when(newest)}` : "";
-}
-
-function renderHealth(h) {
-  $("h-last-poll").textContent = when(h.last_poll_at);
-  $("h-last-success").textContent = when(h.last_success_at);
-  $("h-last-captured").textContent = when(h.last_captured_at);
-  $("h-key").textContent = when(h.key_expires_at);
-  $("h-quota").textContent = h.rate_limit_remaining === null ? "—" : String(h.rate_limit_remaining);
-  const rows = h.errors.map((e) => cells([when(e.at), e.kind, e.http_status === null ? "—" : String(e.http_status), e.problem_type ?? "—"]));
-  $("errors").replaceChildren(...(rows.length > 0 ? rows : [emptyRow("No errors", 4)]));
 }
 
 function openRow(o) {
@@ -222,7 +160,6 @@ async function refresh() {
   health = h;
   renderCar(car);
   renderBanners();
-  renderHealth(h);
   await renderMonths(monthData.months);
 }
 
@@ -231,24 +168,6 @@ $("month").addEventListener("change", (event) => {
   renderStats();
   run(() => loadSessions(selectedMonth));
 });
-
-$("recompute").addEventListener("click", () =>
-  run(async () => {
-    const { updated } = await api("/api/sessions/recompute-cost", { method: "POST" });
-    showMessage(`Recomputed costs for ${updated} session(s).`);
-    await refresh();
-  }),
-);
-
-$("home").addEventListener("click", () =>
-  run(async () => {
-    const replace = health.home_set;
-    if (replace && !confirm("A home position is already set. Replace it with the car's current parked position?")) return;
-    await api(`/setup/home${replace ? "?force=1" : ""}`, { method: "POST" });
-    showMessage("Home position captured.");
-    await refresh();
-  }),
-);
 
 // Chart colours are read from CSS variables, so the chart is redrawn when the scheme changes.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderChart());

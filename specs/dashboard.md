@@ -1,6 +1,6 @@
 # Dashboard
 
-One static page with no framework and no build step: `public/index.html`, `public/app.js`, `public/style.css`, and Chart.js from `public/vendor/`. Data comes from [api.md](api.md).
+Two static pages with no framework and no build step: the dashboard (`public/index.html`, `public/app.js`, and Chart.js from `public/vendor/`) and the data health page (`public/health.html`, `public/health.js`). Both use `public/common.js` and `public/style.css`. Data comes from [api.md](api.md). "The page" below means the dashboard, unless a requirement says otherwise.
 
 To check any of these requirements, load the seed data and open `http://localhost:8787`. Use `localhost`, because SEC-3 does not apply to `127.0.0.1`.
 
@@ -42,7 +42,7 @@ The page shall list the month's sessions, newest first, with start, duration, kW
 
 Phase: 3. Verified by: manual.
 
-The page shall show last poll, last success, last car data, key expiry, quota remaining and the last 10 errors.
+A separate page at `/health` shall show last poll, last success, last car data, key expiry, quota remaining and the last 10 errors. The dashboard shall link to it and not show these itself, and DASH-1 shall stay on the dashboard so that a problem is still seen there.
 
 ### DASH-7: Settings
 
@@ -54,19 +54,19 @@ Removed: there are no editable settings.
 
 Phase: 3. Verified by: manual.
 
-The page shall have **Recompute all costs** and **Capture home position** buttons, and shall ask for confirmation before replacing a home position that is already set.
+Removed: both actions are rare maintenance, so the page has no buttons. HOME-4 and API-6 stay as routes, and the README says how to call them.
 
 ### DASH-9: Request handling
 
 Phase: 3. Verified by: manual.
 
-Every POST and PUT shall send `Content-Type: application/json`. API values shall be set with `textContent`, never `innerHTML`. A failed request shall show a visible message.
+API values shall be set with `textContent`, never `innerHTML`. A failed request shall show a visible message.
 
 ### DASH-10: Display
 
 Phase: 3. Verified by: manual.
 
-Money shall show as `(c / 100).toFixed(2)` and times as `new Date(seconds * 1000).toLocaleString()`. Colours shall be CSS variables on `:root`, with dark values under `prefers-color-scheme: dark`. At 375 px wide, the page shall not scroll sideways, and the session table shall scroll inside its own container.
+Money shall show as `(c / 100).toFixed(2)` and times as `new Date(seconds * 1000).toLocaleString()`. Colours shall be CSS variables on `:root`, with dark values under `prefers-color-scheme: dark`. At 375 px wide, neither page shall scroll sideways, and tables shall scroll inside their own containers.
 
 ### DASH-11: Car now
 

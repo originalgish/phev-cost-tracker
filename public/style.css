@@ -6,7 +6,6 @@
   --muted: #5b6474;
   --border: #d8dde6;
   --accent: #1d4ed8;
-  --accent-text: #ffffff;
   --banner-bg: #fff4d6;
   --banner-text: #6b4300;
   --error-bg: #fde3e1;
@@ -23,7 +22,6 @@
     --muted: #9ba4b4;
     --border: #2b3343;
     --accent: #60a5fa;
-    --accent-text: #0b1020;
     --banner-bg: #3a2e12;
     --banner-text: #fde7a6;
     --error-bg: #3d1a18;
@@ -60,13 +58,20 @@ h2 {
   margin: 1.25rem 0 0.5rem;
 }
 
-h3 {
-  font-size: 1rem;
-  margin: 1rem 0 0.5rem;
-}
-
 p {
   margin: 0.5rem 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 16px;
 }
 
 .card {
@@ -90,20 +95,14 @@ p {
 }
 
 #status {
-  border: 1px solid var(--border);
+  background: var(--error-bg);
+  color: var(--error-text);
   border-radius: 6px;
   padding: 8px 12px;
   margin: 0 0 16px;
 }
 
-#status.error {
-  background: var(--error-bg);
-  color: var(--error-text);
-  border-color: transparent;
-}
-
-select,
-button {
+select {
   font: inherit;
   color: var(--text);
   background: var(--surface);
@@ -111,14 +110,6 @@ button {
   border-radius: 6px;
   padding: 6px 8px;
   min-width: 0;
-}
-
-button {
-  background: var(--accent);
-  color: var(--accent-text);
-  border-color: transparent;
-  padding: 8px 14px;
-  cursor: pointer;
 }
 
 .month-picker {
@@ -218,10 +209,4 @@ tr.open td {
 
 .health dd {
   margin: 0;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
