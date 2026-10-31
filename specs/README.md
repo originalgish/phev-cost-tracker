@@ -2,8 +2,6 @@
 
 The files here are the source of truth for how the tracker behaves. If code, a test or another document disagrees with a spec, the spec wins until someone changes it on purpose.
 
-`PLAN.md` explains the goal and the original reasoning. `IMPLEMENTATION_PLAN.md` is the build order. Neither one overrides a spec.
-
 ## Workflow
 
 Every behaviour change follows the same order:
@@ -57,4 +55,4 @@ describe("SES-1 opening", () => { ... });
 | [dashboard.md](dashboard.md) | `DASH` | The web page |
 | [operations.md](operations.md) | `OPS` | Running within the free tier |
 | [skoda-api.md](skoda-api.md) | none | Facts about the Škoda API |
-| [decisions.md](decisions.md) | none | Where the specs differ from `PLAN.md`, and why |
+| [decisions.md](decisions.md) | none | The design choices behind the specs, and why |
