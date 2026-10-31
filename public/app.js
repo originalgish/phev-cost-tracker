@@ -20,13 +20,10 @@ let monthRows = [];
 let selectedMonth = null;
 let chart = null;
 
-async function api(path, { method = "GET", body } = {}) {
-  const init = { method, headers: {} };
-  if (method !== "GET") init.headers["Content-Type"] = "application/json";
-  if (body !== undefined) init.body = JSON.stringify(body);
+async function api(path) {
   let res;
   try {
-    res = await fetch(path, init);
+    res = await fetch(path);
   } catch {
     throw new Error("Network error. Check the connection and try again.");
   }
@@ -35,10 +32,9 @@ async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
-function showMessage(text, isError = false) {
+function showError(text) {
   const status = $("status");
   status.textContent = text;
-  status.className = isError ? "error" : "";
   status.hidden = false;
   // The message sits at the top, so bring it into view when the user is further down the page.
   status.scrollIntoView({ block: "nearest" });
@@ -48,7 +44,7 @@ async function run(task) {
   try {
     await task();
   } catch (err) {
-    showMessage(err.message, true);
+    showError(err.message);
   }
 }
 
@@ -231,24 +227,6 @@ $("month").addEventListener("change", (event) => {
   renderStats();
   run(() => loadSessions(selectedMonth));
 });
-
-$("recompute").addEventListener("click", () =>
-  run(async () => {
-    const { updated } = await api("/api/sessions/recompute-cost", { method: "POST" });
-    showMessage(`Recomputed costs for ${updated} session(s).`);
-    await refresh();
-  }),
-);
-
-$("home").addEventListener("click", () =>
-  run(async () => {
-    const replace = health.home_set;
-    if (replace && !confirm("A home position is already set. Replace it with the car's current parked position?")) return;
-    await api(`/setup/home${replace ? "?force=1" : ""}`, { method: "POST" });
-    showMessage("Home position captured.");
-    await refresh();
-  }),
-);
 
 // Chart colours are read from CSS variables, so the chart is redrawn when the scheme changes.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderChart());

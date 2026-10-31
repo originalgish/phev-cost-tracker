@@ -54,13 +54,13 @@ Removed: there are no editable settings.
 
 Phase: 3. Verified by: manual.
 
-The page shall have **Recompute all costs** and **Capture home position** buttons, and shall ask for confirmation before replacing a home position that is already set.
+Removed: both actions are rare maintenance, so the page has no buttons. HOME-4 and API-6 stay as routes, and the README says how to call them.
 
 ### DASH-9: Request handling
 
 Phase: 3. Verified by: manual.
 
-Every POST and PUT shall send `Content-Type: application/json`. API values shall be set with `textContent`, never `innerHTML`. A failed request shall show a visible message.
+API values shall be set with `textContent`, never `innerHTML`. A failed request shall show a visible message.
 
 ### DASH-10: Display
 

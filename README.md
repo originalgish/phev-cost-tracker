@@ -13,7 +13,7 @@ The tracker polls the Škoda Connect API, turns the car's readings into charge s
 3. **At home.** The parked position is compared with the home position captured once at setup, within 50 m. If the car reports no position, the last known value carries over while it stays plugged in; otherwise it is unknown.
 4. **Session.** A session opens when the car is plugged in, charging and at home. It closes on unplug, when charging ends, or after 180 minutes of silence. Charges away from home are ignored.
 5. **Energy.** Each session gets two estimates: integrated charge power, and the change in SoC times usable battery size. Billed energy uses the power estimate and falls back to SoC if that has gaps.
-6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config.ts](src/config.ts); a price change is a code change followed by **Recompute all costs**.
+6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config.ts](src/config.ts). Costs are stored when a session closes, so a price change is a code change that applies to new sessions.
 7. **Alerts.** Optional webhook, for example ntfy.sh. Sent for a key expiring within 14 days, three auth or rate-limit failures in a row, or no successful poll for 6 hours. Each kind is sent at most once a day.
 
 ## Architecture
@@ -71,6 +71,17 @@ pnpm check:specs 3   # also require a test for every requirement up to phase 3
 ```
 
 Behaviour changes follow [specs/README.md](specs/README.md): spec, then a failing test with the requirement ID in its title, then code, then `pnpm check`, then one commit.
+
+## Maintenance
+
+These routes have no buttons. To call one, log in to the dashboard, open the browser console and run:
+
+```js
+await fetch("/setup/home", { method: "POST", headers: { "Content-Type": "application/json" } }).then((r) => r.json());
+```
+
+- `/setup/home` stores the car's current parked position as home. Run it once at setup, with the car parked at home. Add `?force=1` to replace a stored position.
+- `/api/sessions/recompute-cost` applies the current price and battery size to every closed session, so use it only to correct a wrong constant. After a contract change it would reprice past sessions at the new price.
 
 ## Deploy
 
