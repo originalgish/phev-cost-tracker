@@ -18,7 +18,7 @@ The page shall show one line for each of these that applies:
 
 Phase: 3. Verified by: manual.
 
-The page shall offer a month selector, newest first. With no months, it shall show "No charging sessions yet" and hide DASH-3, DASH-4 and DASH-5.
+The page shall offer a month selector, newest first. With no months, it shall show "No charging sessions yet" and hide DASH-3, DASH-4 and the session table of DASH-5. The "Charging now" line of DASH-5 is not hidden.
 
 ### DASH-3: Month stats
 
@@ -36,7 +36,7 @@ The page shall show bars of `cost_c` in euros for up to 12 months, oldest on the
 
 Phase: 3. Verified by: manual.
 
-The page shall list the month's sessions, newest first, with start, duration, kWh by power, kWh by SoC, billed kWh with its source, and cost in euros. Rows with gaps shall say "gaps in power data". If `open_session` is set, it shall appear first as "Charging now".
+The page shall list the month's sessions, newest first, with start, duration, kWh by power, kWh by SoC, billed kWh with its source, and cost in euros. Rows with gaps shall say "gaps in power data". If `open_session` is set, a "Charging now" line with its start time and kWh by power shall show above the month selector, whether or not any month exists. It is not a row of the table.
 
 ### DASH-6: Data health
 
