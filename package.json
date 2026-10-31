@@ -1,0 +1,26 @@
+{
+  "name": "phev-cost-tracker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "test": "vitest run",
+    "typecheck": "wrangler types && tsc --noEmit",
+    "check:specs": "node scripts/check-specs.mjs",
+    "check": "pnpm test && pnpm typecheck && pnpm check:specs",
+    "migrate:local": "wrangler d1 migrations apply phev-cost-tracker --local",
+    "migrate:remote": "wrangler d1 migrations apply phev-cost-tracker --remote",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "hono": "4.13.14",
+    "jose": "6.2.14"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.11",
+    "chart.js": "4.6.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5",
+    "wrangler": "4.156.0"
+  }
+}
