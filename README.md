@@ -4,7 +4,7 @@ Answers one question: how much does it cost to charge my Škoda Kodiaq PHEV at h
 
 The tracker polls the Škoda Connect API, turns the car's readings into charge sessions, and prices them at your fixed electricity price. It is single-user and self-hosted: you bring your own API key and run it on your own Cloudflare account. Home charging only.
 
-**Status:** built through Phase 3 and deployed. Every push to `main` that passes the checks is deployed automatically. The first-time setup steps are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and need the owner's Cloudflare login and car.
+**Status:** built through Phase 3 and deployed. Every merge to `main` is deployed automatically. The first-time setup steps are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and need the owner's Cloudflare login and car.
 
 ## How it works
 
@@ -74,7 +74,9 @@ Behaviour changes follow [specs/README.md](specs/README.md): spec, then a failin
 
 ## Deploy
 
-[GitHub Actions](.github/workflows/ci.yml) runs `pnpm check` on every push and pull request. On a push to `main` that passes, it applies D1 migrations and then deploys the Worker. Migrations run first, so a migration must not break the version that is still running.
+`main` is protected: every change arrives through a pull request that the owner merges, on a branch that is up to date and has a passing `check`. Direct pushes, force-pushes and deleting `main` are blocked, for the owner too.
+
+[GitHub Actions](.github/workflows/ci.yml) runs `pnpm check` on every pull request and on `main`. After a merge it applies D1 migrations and then deploys the Worker. Migrations run first, so a migration must not break the version that is still running.
 
 The workflow needs two repository secrets, `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token comes from the **Edit Cloudflare Workers** template with **D1: Edit** added. Worker secrets such as the Škoda API key stay in Wrangler and are not touched by a deploy.
 
