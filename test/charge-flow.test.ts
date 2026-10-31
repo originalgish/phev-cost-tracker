@@ -28,7 +28,7 @@ describe("charge flow", () => {
     expect(row?.end_reason).toBe("charge_ended");
     expect(row?.local_month).toBe("2026-11"); // 00:00 on 1 Nov in Helsinki
     expect(row?.kwh_by_power).toBeCloseTo(1.5, 6);
-    expect(row?.kwh_by_soc).toBeCloseTo(1.6, 6);
+    expect(row?.kwh_by_soc).toBeCloseTo(1.576, 6); // 8 % of 19.7 kWh
     expect(row?.kwh_source).toBe("power");
     expect(row?.cost_c).toBeCloseTo(11.805, 6); // 1.5 kWh at 7.87 c
   });

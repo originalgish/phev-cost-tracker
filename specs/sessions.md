@@ -54,7 +54,7 @@ When an interval is longer than 45 minutes or a power value is missing, the trac
 
 Phase: 2. Verified by: test.
 
-The SoC-based energy shall be `(end_soc − start_soc) / 100 × 20`, never below zero. `end_soc` is the highest SoC seen in the session. If the first sample has no SoC, `start_soc` is the first SoC seen.
+The SoC-based energy shall be `(end_soc − start_soc) / 100 × 19.7`, never below zero. 19.7 kWh is the usable capacity (25.7 kWh gross) from Škoda's technical data. `end_soc` is the highest SoC seen in the session. If the first sample has no SoC, `start_soc` is the first SoC seen.
 
 ### SES-10: Month
 
