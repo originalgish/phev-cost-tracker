@@ -6,18 +6,34 @@ export type ParkingPosition = {
   gpsCoordinates?: { latitude: number; longitude: number };
 };
 
+export type EngineRange = { engineType?: string; currentFuelLevelInPercent?: number };
+
 export type VehicleResponse = {
   vehicle?: {
     parkingPosition?: ParkingPosition;
-    odometer?: { mileageInKm: number };
+    odometer?: { carCapturedTimestamp?: string; mileageInKm?: number };
     charging?: {
       carCapturedTimestamp?: string;
+      settings?: { targetStateOfChargeInPercent?: number };
       status?: {
         state?: string;
         plugConnectionState?: string;
         chargePowerInKw?: number;
-        battery?: { stateOfChargeInPercent?: number };
+        remainingTimeToFullyChargedInMinutes?: number;
+        battery?: { stateOfChargeInPercent?: number; remainingCruisingRangeInMeters?: number };
       };
+    };
+    fuelStatus?: {
+      carCapturedTimestamp?: string;
+      totalRangeInKm?: number;
+      primaryEngineRange?: EngineRange;
+      secondaryEngineRange?: EngineRange;
+    };
+    status?: { carCapturedTimestamp?: string; overall?: { locked?: string; reliableLockStatus?: string } };
+    airConditioning?: {
+      carCapturedTimestamp?: string;
+      state?: string;
+      targetTemperature?: { value?: number; unit?: string };
     };
   };
   errors?: { type: string }[];

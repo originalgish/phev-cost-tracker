@@ -37,3 +37,9 @@ Phase: 2. Verified by: test.
 Phase: 2. Verified by: test.
 
 `POST /api/sessions/recompute-cost` shall do COST-4 and return `{ updated }`. `POST /api/sessions/rebuild?from=&to=` shall do SES-11 for unix seconds `from` to `to` and return `{ sessions }`. It shall answer `400` for an invalid range and `409` while a session is open.
+
+### API-7: Car state
+
+Phase: 4. Verified by: test.
+
+`GET /api/vehicle` shall return an object keyed by part name (`charging`, `fuelStatus`, `status`, `airConditioning`, `odometer`). Each value shall be `captured_at` plus the fields of POLL-12 for that part. A part the tracker has never stored shall be absent.

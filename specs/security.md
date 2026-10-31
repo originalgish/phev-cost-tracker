@@ -41,3 +41,9 @@ Cloudflare Access shall cover all traffic to the Worker, and preview URLs shall 
 Phase: 1. Verified by: manual.
 
 The public repository shall contain no API key, real VIN, raw API output or home position. To check, read the staged diff before each commit.
+
+### SEC-8: Car state privacy
+
+Phase: 4. Verified by: test.
+
+The stored latest car state shall hold only the fields listed in POLL-12. It shall never hold the VIN, licence plate, vehicle name or coordinates, even when the API response contains them.

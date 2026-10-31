@@ -13,6 +13,7 @@ export async function resetDb(): Promise<void> {
     env.DB.prepare("DELETE FROM charge_session"),
     env.DB.prepare("DELETE FROM poll_error"),
     env.DB.prepare("DELETE FROM alert_log"),
+    env.DB.prepare("DELETE FROM vehicle_state"),
     env.DB.prepare("DELETE FROM poll_state"),
     env.DB.prepare("INSERT INTO poll_state (id) VALUES (1)"),
     env.DB.prepare("DELETE FROM settings"),
@@ -41,6 +42,38 @@ export function vehicleBody(o: BodyOptions) {
           battery: { stateOfChargeInPercent: o.soc ?? 20 },
         },
       },
+    },
+    errors: [],
+  };
+}
+
+// vehicleBody plus every other part the dashboard shows, and fields that must never be stored.
+export function fullVehicleBody(o: BodyOptions) {
+  const base = vehicleBody(o);
+  return {
+    vehicle: {
+      ...base.vehicle,
+      vin: "SECRETVIN0000000X",
+      name: "Secret name",
+      licensePlate: "SECRET-1",
+      odometer: { carCapturedTimestamp: o.ts, mileageInKm: 1000 },
+      charging: {
+        ...base.vehicle.charging,
+        settings: { targetStateOfChargeInPercent: 100 },
+        status: {
+          ...base.vehicle.charging.status,
+          remainingTimeToFullyChargedInMinutes: 280,
+          battery: { stateOfChargeInPercent: o.soc ?? 57, remainingCruisingRangeInMeters: 54400 },
+        },
+      },
+      fuelStatus: {
+        carCapturedTimestamp: o.ts,
+        totalRangeInKm: 584,
+        primaryEngineRange: { engineType: "ELECTRIC", currentSoCInPercent: 57, remainingRangeInKm: 54 },
+        secondaryEngineRange: { engineType: "GASOLINE", currentFuelLevelInPercent: 90, remainingRangeInKm: 530 },
+      },
+      status: { carCapturedTimestamp: o.ts, overall: { locked: "YES", reliableLockStatus: "LOCKED" } },
+      airConditioning: { carCapturedTimestamp: o.ts, state: "OFF", targetTemperature: { value: 20, unit: "CELSIUS" } },
     },
     errors: [],
   };

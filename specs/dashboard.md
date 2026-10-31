@@ -67,3 +67,20 @@ Every POST and PUT shall send `Content-Type: application/json`. API values shall
 Phase: 3. Verified by: manual.
 
 Money shall show as `(c / 100).toFixed(2)` and times as `new Date(seconds * 1000).toLocaleString()`. Colours shall be CSS variables on `:root`, with dark values under `prefers-color-scheme: dark`. At 375 px wide, the page shall not scroll sideways, and the session table shall scroll inside its own container.
+
+### DASH-11: Car now
+
+Phase: 4. Verified by: manual.
+
+Above the month selector, the page shall show a "Car now" card with what the My Škoda app shows, taken from API-7, and `—` for any missing value:
+
+- lock state
+- total range in km, and fuel level in %
+- battery charge in %, battery range in km, charge target in %, charge state and power in kW. While the state is `CHARGING` and a time is known, also the time left as `H:MM h left`
+- climate state and target temperature
+- odometer in km
+- the newest `captured_at` as "Updated TIME"
+
+The Škoda API offers no consumption averages, so the page shall not show any. With no car state stored, the card shall say "No car data yet".
+
+To check, load the seed data and compare the card with the seed rows of `vehicle_state`.

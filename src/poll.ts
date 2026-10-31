@@ -3,9 +3,10 @@ import { nextNotBefore, shouldPoll } from "./gate";
 import { toSample } from "./sample";
 import { sessionWrites } from "./session-store";
 import { loadSettings } from "./settings";
+import { carStateWrites } from "./vehicle-state";
 import { fetchVehicle, type FetchFailure, type RateMeta } from "./skoda";
 
-const POLL_PARTS = ["charging", "parkingPosition", "odometer"];
+const POLL_PARTS = ["charging", "fuelStatus", "status", "airConditioning", "parkingPosition", "odometer"];
 const ERROR_RETENTION_SECONDS = 30 * 86400;
 
 export type PollStateRow = {
@@ -109,6 +110,7 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
     );
   }
   writes.push(
+    ...carStateWrites(db, result.body),
     successWrite(db, result.meta, nowSec),
     db
       .prepare(

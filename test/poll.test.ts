@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pollOnce } from "../src/poll";
-import { AWAY, T0, apiResponse, mockApiSequence, resetDb, setHome, vehicleBody } from "./helpers";
+import { AWAY, T0, apiResponse, fullVehicleBody, mockApiSequence, resetDb, setHome, vehicleBody } from "./helpers";
 
 beforeEach(resetDb);
 afterEach(() => vi.restoreAllMocks());
@@ -135,5 +135,83 @@ describe("pollOnce", () => {
     const row = await env.DB.prepare("SELECT * FROM snapshot").first();
     expect(Object.keys(row ?? {})).not.toContain("latitude");
     expect(JSON.stringify(row)).not.toContain("60.17");
+  });
+});
+
+const carState = async () => {
+  const { results } = await env.DB.prepare("SELECT part, captured_at, data FROM vehicle_state ORDER BY part").all<{ part: string; captured_at: number | null; data: string }>();
+  return Object.fromEntries(results.map((r) => [r.part, { captured_at: r.captured_at, ...JSON.parse(r.data) }]));
+};
+
+describe("car state", () => {
+  it("POLL-3 asks for every part the dashboard shows", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ vehicle: {} }));
+    await pollOnce(env, T0);
+    const parts = new URL(String(f.mock.calls[0]?.[0])).searchParams.getAll("include");
+    expect(parts.sort()).toEqual(["airConditioning", "charging", "fuelStatus", "odometer", "parkingPosition", "status"]);
+  });
+  it("POLL-12 stores the latest state of each part", async () => {
+    mockApiSequence([fullVehicleBody({ ts: "2026-10-31T22:00Z", state: "CHARGING", kw: 2 })]);
+    await pollOnce(env, T0);
+    const at = Date.parse("2026-10-31T22:00:00Z") / 1000;
+    expect(await carState()).toEqual({
+      charging: { captured_at: at, state: "CHARGING", plug_state: "CONNECTED", power_kw: 2, soc_percent: 57, range_km: 54, target_soc_percent: 100, minutes_to_full: 280 },
+      fuelStatus: { captured_at: at, total_range_km: 584, fuel_percent: 90 },
+      status: { captured_at: at, locked: "LOCKED" },
+      airConditioning: { captured_at: at, state: "OFF", target_temp: 20, target_temp_unit: "CELSIUS" },
+      odometer: { captured_at: at, km: 1000 },
+    });
+  });
+  it("POLL-12 replaces old values, storing NULL for what the car stopped reporting", async () => {
+    const later = fullVehicleBody({ ts: "2026-10-31T22:10Z", state: "READY_FOR_CHARGING" });
+    Object.assign(later.vehicle.charging.status, { remainingTimeToFullyChargedInMinutes: undefined });
+    mockApiSequence([fullVehicleBody({ ts: "2026-10-31T22:00Z", state: "CHARGING" }), later]);
+    await pollOnce(env, T0);
+    await pollOnce(env, T0 + 900);
+    expect((await carState()).charging).toMatchObject({ captured_at: Date.parse("2026-10-31T22:10:00Z") / 1000, state: "READY_FOR_CHARGING", minutes_to_full: null });
+  });
+  it("POLL-12 keeps the old state of a part the response lacks", async () => {
+    const partial = fullVehicleBody({ ts: "2026-10-31T22:10Z" });
+    Reflect.deleteProperty(partial.vehicle, "fuelStatus");
+    Reflect.deleteProperty(partial.vehicle, "airConditioning");
+    mockApiSequence([fullVehicleBody({ ts: "2026-10-31T22:00Z" }), partial]);
+    await pollOnce(env, T0);
+    await pollOnce(env, T0 + 900);
+    const state = await carState();
+    const first = Date.parse("2026-10-31T22:00:00Z") / 1000;
+    expect(state.fuelStatus).toMatchObject({ captured_at: first, total_range_km: 584 });
+    expect(state.airConditioning).toMatchObject({ captured_at: first });
+    expect(state.status.captured_at).toBe(Date.parse("2026-10-31T22:10:00Z") / 1000);
+  });
+  it("POLL-12 stores car state even when charging is missing", async () => {
+    const body = fullVehicleBody({ ts: "2026-10-31T22:00Z" });
+    Reflect.deleteProperty(body.vehicle, "charging");
+    mockApiSequence([{ ...body, errors: [{ type: "CHARGING_UNAVAILABLE" }] }]);
+    expect(await pollOnce(env, T0)).toBe("partial");
+    expect(Object.keys(await carState())).toEqual(["airConditioning", "fuelStatus", "odometer", "status"]);
+  });
+  it("POLL-12 picks the lock state and the fuel engine by what the API says, not by position", async () => {
+    const body = fullVehicleBody({ ts: "2026-10-31T22:00Z" });
+    const { primaryEngineRange, secondaryEngineRange } = body.vehicle.fuelStatus;
+    Object.assign(body.vehicle.fuelStatus, { primaryEngineRange: secondaryEngineRange, secondaryEngineRange: primaryEngineRange });
+    body.vehicle.status.overall = { locked: "NO", reliableLockStatus: "UNKNOWN" };
+    mockApiSequence([body]);
+    await pollOnce(env, T0);
+    const state = await carState();
+    expect(state.fuelStatus.fuel_percent).toBe(90);
+    expect(state.status.locked).toBe("UNLOCKED");
+  });
+  it("POLL-12 stores a missing field as NULL", async () => {
+    mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" })]);
+    await pollOnce(env, T0);
+    expect((await carState()).charging).toMatchObject({ range_km: null, target_soc_percent: null, minutes_to_full: null });
+  });
+  it("SEC-8 never stores the VIN, plate, name or coordinates", async () => {
+    await setHome();
+    mockApiSequence([fullVehicleBody({ ts: "2026-10-31T22:00Z" })]);
+    await pollOnce(env, T0);
+    const { results } = await env.DB.prepare("SELECT * FROM vehicle_state").all();
+    const stored = JSON.stringify(results);
+    for (const secret of ["SECRETVIN", "Secret name", "SECRET-1", "60.17", "24.94", "gps", "latitude"]) expect(stored).not.toContain(secret);
   });
 });

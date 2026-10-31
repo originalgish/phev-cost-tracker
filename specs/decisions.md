@@ -6,6 +6,7 @@ Checking `PLAN.md` against the live Škoda OpenAPI spec and the current Cloudfla
 |---|---|---|---|
 | Timestamp | `carCapturedTimestamp` on each section | Use `charging.carCapturedTimestamp` only | The spec has it on `charging` and `odometer`, not on `parkingPosition` |
 | `include` | `charging`, `parkingPosition` | Adds `odometer` | The snapshot stores the odometer, and a part that is not included is absent |
+| `include` for the dashboard | `charging`, `parkingPosition`, `odometer` | Adds `fuelStatus`, `status`, `airConditioning` | The dashboard shows what the My Škoda app shows. The same request carries them, so the quota use is unchanged. Only the fields in POLL-12 are stored |
 | `include` format | Repeated params | Repeated params kept | Verified on the real car by `probe.py`. The spec also describes a comma-separated form, which has not been tested on this car |
 | Cron | One or two schedules | One `*/5 * * * *` cron with a gate in code | A 5-minute tick can hit both the 10-minute and 15-minute cadence. Idle polling stays at 15 minutes |
 | `at_home` | Boolean | True, false or NULL (unknown) | The position can be missing, for example `IN_MOTION` or `PARKING_POSITION_UNAVAILABLE` |

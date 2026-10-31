@@ -151,3 +151,18 @@ describe("HOME-4 POST /setup/home", () => {
     expect((await send("POST", "/setup/home", h)).status).toBe(403);
   });
 });
+
+describe("API-7 car state", () => {
+  it("returns each stored part with its time and fields, and omits the others", async () => {
+    mockFetch(() => new Response("{}"));
+    await env.DB.prepare("INSERT INTO vehicle_state (part, captured_at, data) VALUES ('odometer', 1790000000, '{\"km\":18695}')").run();
+    const res = await get("/api/vehicle", await authedHeaders());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ odometer: { captured_at: 1790000000, km: 18695 } });
+  });
+  it("returns an empty object before the first poll", async () => {
+    mockFetch(() => new Response("{}"));
+    expect(await (await get("/api/vehicle", await authedHeaders())).json()).toEqual({});
+  });
+  it("needs an access token", async () => expect((await get("/api/vehicle")).status).toBe(403));
+});

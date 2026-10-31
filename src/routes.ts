@@ -29,6 +29,11 @@ app.get("/api/health", async (c) => {
   });
 });
 
+app.get("/api/vehicle", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT part, captured_at, data FROM vehicle_state").all<{ part: string; captured_at: number | null; data: string }>();
+  return c.json(Object.fromEntries(results.map((r) => [r.part, { captured_at: r.captured_at, ...JSON.parse(r.data) }])));
+});
+
 app.post("/setup/home", async (c) => {
   const db = c.env.DB;
   const settings = await loadSettings(db);
