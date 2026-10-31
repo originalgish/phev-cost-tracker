@@ -1,10 +1,11 @@
 """One-off probe: dump what the Škoda public API returns for a vehicle.
 
-Usage: SKODA_API_KEY=... SKODA_VIN=... python3 probe.py [out.json]
+Usage: SKODA_API_KEY=... SKODA_VIN=... python3 probe.py
+
+The output holds the VIN and GPS position, so it only goes to the git-ignored probe-output.json.
 """
 import json
 import os
-import sys
 import urllib.error
 import urllib.request
 
@@ -13,7 +14,7 @@ INCLUDES = ["info", "status", "fuelStatus", "odometer", "parkingPosition", "char
 
 key = os.environ["SKODA_API_KEY"]
 vin = os.environ["SKODA_VIN"]
-out = sys.argv[1] if len(sys.argv) > 1 else "probe-output.json"
+out = "probe-output.json"
 
 url = f"{BASE}/{vin}?" + "&".join(f"include={i}" for i in INCLUDES)
 req = urllib.request.Request(url, headers={"X-API-Key": key, "Accept": "application/json"})
