@@ -14,7 +14,7 @@ Rules for the implementer:
 4. **The spec wins.** If the code here, a test or anything else disagrees with a spec, stop and ask the user. Do not change a spec without the user's approval. Do not change tests to make them pass.
 5. **Do not make design decisions.** If a check fails, follow [Troubleshooting](#troubleshooting). If that does not fix it, stop and ask the user.
 6. **Run the checks in every task.** A task is finished only when every "Done when" item is true.
-7. **Commit and push after each task** using the message given, on `main`. Stage only the files listed in that task. Never force-push.
+7. **Commit and push after each task** using the message given, on a branch, then open a pull request for the owner to merge. Stage only the files listed in that task. Never force-push.
 8. **Stop at `[HUMAN]` tasks.** They need the user's Cloudflare login, phone or car. Print the steps, wait for the user, then continue.
 9. **Never put secrets anywhere.** The repository is public. The API key, the real VIN and raw API output must not appear in code, tests, logs, commits or chat. Tests use the example VIN from the Škoda spec, `TMBJB9NY5RF999999`.
 10. **Never print the home position.** Do not `SELECT` `home_lat` or `home_lon`, and do not `SELECT *` from `settings`, against the remote database.
