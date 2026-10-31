@@ -22,7 +22,7 @@ Phase: 1. Verified by: test.
 
 Phase: 1. Verified by: test.
 
-The tracker shall keep only the last part of a problem `type` from error responses, because other fields can contain the VIN. The API key and VIN shall come from secrets and shall not appear in stored data, responses or logs.
+The tracker shall keep only the last part of a problem `type` from error responses and of each `errors[].type` in a partial `200`, because other fields can contain the VIN. The API key and VIN shall come from secrets and shall not appear in stored data, responses or logs.
 
 ### SEC-5: Position privacy
 

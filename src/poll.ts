@@ -4,7 +4,7 @@ import { toSample } from "./sample";
 import { sessionWrites } from "./session-store";
 import { loadSettings } from "./settings";
 import { carStateWrites } from "./vehicle-state";
-import { fetchVehicle, type FetchFailure, type RateMeta } from "./skoda";
+import { fetchVehicle, typeSlug, type FetchFailure, type RateMeta } from "./skoda";
 
 const POLL_PARTS = ["charging", "fuelStatus", "parkingPosition", "odometer"];
 const ERROR_RETENTION_SECONDS = 30 * 86400;
@@ -99,7 +99,7 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
 
   if (sample === null) {
     const errors = Array.isArray(result.body.errors) ? result.body.errors : [];
-    const kinds = errors.map((e) => e?.type).join(",") || "missing-charging";
+    const kinds = errors.map((e) => typeSlug(e?.type)).join(",") || "missing-charging";
     writes.push(...errorWrites(db, nowSec, "partial", 200, kinds.slice(0, 200)));
   }
   if (sample !== null && isNew) {

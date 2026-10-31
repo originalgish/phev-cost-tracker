@@ -79,11 +79,13 @@ function classify(status: number): ErrorKind {
   return "server";
 }
 
+export const typeSlug = (type: unknown): string | null => (typeof type === "string" ? (type.split("/").pop() ?? null) : null);
+
 // Only the slug of the problem type is kept: `detail` and `instance` can carry the VIN.
 async function problemSlug(res: Response): Promise<string | null> {
   try {
     const body = await res.json<{ type?: unknown }>();
-    return typeof body.type === "string" ? (body.type.split("/").pop() ?? null) : null;
+    return typeSlug(body.type);
   } catch {
     return null;
   }

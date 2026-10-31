@@ -66,6 +66,12 @@ describe("pollOnce", () => {
     expect(await env.DB.prepare("SELECT kind, problem_type FROM poll_error").first()).toEqual({ kind: "partial", problem_type: "CHARGING_UNAVAILABLE" });
     expect(await count("snapshot")).toBe(0);
   });
+  it("SEC-4 keeps only the last part of partial error types", async () => {
+    const errors = [{ type: "https://x/vehicles/SECRETVIN/CHARGING_UNAVAILABLE" }, { type: "PARKING_UNAVAILABLE" }];
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ vehicle: {}, errors }));
+    await pollOnce(env, T0);
+    expect(await env.DB.prepare("SELECT problem_type FROM poll_error").first()).toEqual({ problem_type: "CHARGING_UNAVAILABLE,PARKING_UNAVAILABLE" });
+  });
   it("POLL-5 POLL-8 survives a 200 with no vehicle", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ errors: [{ type: "VEHICLE_UNAVAILABLE" }] }));
     expect(await pollOnce(env, T0)).toBe("partial");
