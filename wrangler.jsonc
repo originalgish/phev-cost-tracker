@@ -14,9 +14,10 @@
   },
   "d1_databases": [
     {
-      "binding": "phev_cost_tracker",
+      "binding": "DB",
       "database_name": "phev-cost-tracker",
-      "database_id": "29fd241a-0450-4c23-9bd1-acfad9781b1d"
+      "database_id": "29fd241a-0450-4c23-9bd1-acfad9781b1d",
+      "migrations_dir": "migrations"
     }
   ],
   "vars": {
