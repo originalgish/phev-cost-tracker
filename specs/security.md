@@ -47,3 +47,9 @@ The public repository shall contain no API key, real VIN, raw API output or home
 Phase: 4. Verified by: test.
 
 The stored latest car state shall hold only the fields listed in POLL-12. It shall never hold the VIN, licence plate, vehicle name or coordinates, even when the API response contains them.
+
+### SEC-9: Page headers
+
+Phase: 4. Verified by: test.
+
+The dashboard's files shall be served with a `Content-Security-Policy` that allows scripts, styles and connections only from the page's own origin and blocks framing by any page, and with `X-Content-Type-Options: nosniff`.
