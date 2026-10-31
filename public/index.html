@@ -1,3 +1,21 @@
 <!doctype html>
-<title>PHEV Cost Tracker</title>
-<p>Not built yet.</p>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PHEV Cost Tracker</title>
+</head>
+<body>
+  <h1>PHEV Cost Tracker setup</h1>
+  <p><button id="home">Capture home position</button></p>
+  <pre id="out"></pre>
+  <script>
+    const out = document.getElementById("out");
+    const show = async (res) => { out.textContent = JSON.stringify(await res.json(), null, 2); };
+    document.getElementById("home").onclick = async () => {
+      show(await fetch("/setup/home", { method: "POST", headers: { "Content-Type": "application/json" } }));
+    };
+    fetch("/api/health").then(show);
+  </script>
+</body>
+</html>
