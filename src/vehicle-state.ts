@@ -12,12 +12,6 @@ function capturedAt(stamp: unknown): number | null {
   return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
 }
 
-function lockState(overall: NonNullable<Vehicle["status"]>["overall"]): string | null {
-  const reliable = text(overall?.reliableLockStatus);
-  if (reliable !== null && reliable !== "UNKNOWN") return reliable;
-  return { YES: "LOCKED", NO: "UNLOCKED" }[overall?.locked ?? ""] ?? null;
-}
-
 // Each part lists the fields the dashboard shows and nothing else (SEC-8): never copy a whole part.
 const PARTS: Record<string, (v: Vehicle) => Part | null> = {
   charging: ({ charging: c }) => {
@@ -44,14 +38,6 @@ const PARTS: Record<string, (v: Vehicle) => Part | null> = {
       data: { total_range_km: num(f.totalRangeInKm), fuel_percent: num(fuelEngine?.currentFuelLevelInPercent) },
     };
   },
-  status: ({ status: s }) => (s === undefined ? null : { capturedAt: capturedAt(s.carCapturedTimestamp), data: { locked: lockState(s.overall) } }),
-  airConditioning: ({ airConditioning: a }) =>
-    a === undefined
-      ? null
-      : {
-          capturedAt: capturedAt(a.carCapturedTimestamp),
-          data: { state: text(a.state), target_temp: num(a.targetTemperature?.value), target_temp_unit: text(a.targetTemperature?.unit) },
-        },
   odometer: ({ odometer: o }) => (o === undefined ? null : { capturedAt: capturedAt(o.carCapturedTimestamp), data: { km: num(o.mileageInKm) } }),
 };
 

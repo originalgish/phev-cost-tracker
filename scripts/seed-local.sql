@@ -11,8 +11,6 @@ DELETE FROM vehicle_state;
 INSERT INTO vehicle_state (part, captured_at, data) VALUES
   ('charging', unixepoch() - 120, '{"state":"CHARGING","plug_state":"CONNECTED","power_kw":2,"soc_percent":57,"range_km":54,"target_soc_percent":100,"minutes_to_full":280}'),
   ('fuelStatus', unixepoch() - 120, '{"total_range_km":584,"fuel_percent":90}'),
-  ('status', unixepoch() - 120, '{"locked":"LOCKED"}'),
-  ('airConditioning', unixepoch() - 120, '{"state":"OFF","target_temp":20,"target_temp_unit":"CELSIUS"}'),
   ('odometer', unixepoch() - 120, '{"km":18695}');
 
 UPDATE poll_state SET last_poll_at = unixepoch(), last_success_at = unixepoch(), last_captured_at = unixepoch() - 600,

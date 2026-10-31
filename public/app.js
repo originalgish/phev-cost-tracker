@@ -99,11 +99,10 @@ const CHARGE_STATES = {
   CHARGING_INTERRUPTED: "Interrupted",
   DISCHARGING: "Discharging",
 };
-const LOCK_STATES = { LOCKED: "Locked", UNLOCKED: "Unlocked" };
 
 const present = (v) => v !== null && v !== undefined;
 const withUnit = (v, unit) => (present(v) ? `${v} ${unit}` : "—");
-const label = (map, key) => (present(key) ? (map[key] ?? key.charAt(0) + key.slice(1).toLowerCase().replaceAll("_", " ")) : "—");
+const chargeState = (key) => (present(key) ? (CHARGE_STATES[key] ?? key.charAt(0) + key.slice(1).toLowerCase().replaceAll("_", " ")) : "—");
 
 function timeLeft(minutes) {
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")} h left`;
@@ -115,17 +114,13 @@ function renderCar(car) {
   $("car").hidden = parts.length === 0;
   const c = car.charging ?? {};
   const charging = c.state === "CHARGING";
-  $("car-lock").textContent = label(LOCK_STATES, car.status?.locked);
   $("car-range").textContent = withUnit(car.fuelStatus?.total_range_km, "km");
   $("car-fuel").textContent = `Fuel ${withUnit(car.fuelStatus?.fuel_percent, "%")}`;
   $("car-battery").textContent = present(c.soc_percent) ? `${c.soc_percent} % / ${withUnit(c.range_km, "km")}` : "—";
-  const detail = [`Target ${withUnit(c.target_soc_percent, "%")}`, label(CHARGE_STATES, c.state)];
+  const detail = [`Target ${withUnit(c.target_soc_percent, "%")}`, chargeState(c.state)];
   if (charging && present(c.power_kw)) detail.push(`${c.power_kw} kW`);
   if (charging && present(c.minutes_to_full)) detail.push(timeLeft(c.minutes_to_full));
   $("car-charge").textContent = detail.join(" · ");
-  const ac = car.airConditioning ?? {};
-  $("car-climate").textContent = present(ac.target_temp) ? `${ac.target_temp}°${ac.target_temp_unit === "FAHRENHEIT" ? "F" : ""}` : "—";
-  $("car-climate-state").textContent = label({}, ac.state);
   $("car-odometer").textContent = withUnit(car.odometer?.km?.toLocaleString(), "km");
   const newest = Math.max(0, ...parts.map((p) => p.captured_at ?? 0));
   $("car-updated").textContent = newest > 0 ? `Updated ${when(newest)}` : "";

@@ -42,4 +42,4 @@ Phase: 2. Verified by: test.
 
 Phase: 4. Verified by: test.
 
-`GET /api/vehicle` shall return an object keyed by part name (`charging`, `fuelStatus`, `status`, `airConditioning`, `odometer`). Each value shall be `captured_at` plus the fields of POLL-12 for that part. A part the tracker has never stored shall be absent.
+`GET /api/vehicle` shall return an object keyed by part name (`charging`, `fuelStatus`, `odometer`). Each value shall be `captured_at` plus the fields of POLL-12 for that part. A part the tracker has never stored shall be absent.

@@ -18,7 +18,7 @@ When a poll is not due, or the current time is before `not_before`, the tracker 
 
 Phase: 1. Verified by: test.
 
-A poll shall request the vehicle with the `X-API-Key` header and repeated `include` parameters for `charging`, `fuelStatus`, `status`, `airConditioning`, `parkingPosition` and `odometer`.
+A poll shall request the vehicle with the `X-API-Key` header and repeated `include` parameters for `charging`, `fuelStatus`, `parkingPosition` and `odometer`.
 
 ### POLL-4: One snapshot per car update
 
@@ -76,10 +76,8 @@ When logging an API error, the tracker shall delete logged API errors older than
 
 Phase: 4. Verified by: test.
 
-After a successful response, for each of `charging`, `fuelStatus`, `status`, `airConditioning` and `odometer` that the response contains, the tracker shall replace the stored latest state of that part, with that part's `carCapturedTimestamp` in unix seconds, or `NULL` if it has none. A field the car did not report is stored as `NULL`. A part the response does not contain keeps its previous state and time. The stored fields are:
+After a successful response, for each of `charging`, `fuelStatus` and `odometer` that the response contains, the tracker shall replace the stored latest state of that part, with that part's `carCapturedTimestamp` in unix seconds, or `NULL` if it has none. A field the car did not report is stored as `NULL`. A part the response does not contain keeps its previous state and time. The stored fields are:
 
 - `charging`: `state`, `plug_state`, `power_kw`, `soc_percent`, `range_km` (battery range, rounded to whole km), `target_soc_percent`, `minutes_to_full`
 - `fuelStatus`: `total_range_km`, `fuel_percent` (the first engine that is not `ELECTRIC`)
-- `status`: `locked`, which is `overall.reliableLockStatus`, or `LOCKED` or `UNLOCKED` taken from `overall.locked` when that is absent or `UNKNOWN`
-- `airConditioning`: `state`, `target_temp`, `target_temp_unit`
 - `odometer`: `km`

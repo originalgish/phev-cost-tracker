@@ -6,7 +6,7 @@ import { loadSettings } from "./settings";
 import { carStateWrites } from "./vehicle-state";
 import { fetchVehicle, type FetchFailure, type RateMeta } from "./skoda";
 
-const POLL_PARTS = ["charging", "fuelStatus", "status", "airConditioning", "parkingPosition", "odometer"];
+const POLL_PARTS = ["charging", "fuelStatus", "parkingPosition", "odometer"];
 const ERROR_RETENTION_SECONDS = 30 * 86400;
 
 export type PollStateRow = {

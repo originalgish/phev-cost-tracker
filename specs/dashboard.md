@@ -74,10 +74,8 @@ Phase: 4. Verified by: manual.
 
 Above the month selector, the page shall show a "Car now" card with what the My Škoda app shows, taken from API-7, and `—` for any missing value:
 
-- lock state
 - total range in km, and fuel level in %
 - battery charge in %, battery range in km, charge target in %, charge state and power in kW. While the state is `CHARGING` and a time is known, also the time left as `H:MM h left`
-- climate state and target temperature
 - odometer in km
 - the newest `captured_at` as "Updated TIME"
 

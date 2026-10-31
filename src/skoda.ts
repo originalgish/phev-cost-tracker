@@ -29,12 +29,6 @@ export type VehicleResponse = {
       primaryEngineRange?: EngineRange;
       secondaryEngineRange?: EngineRange;
     };
-    status?: { carCapturedTimestamp?: string; overall?: { locked?: string; reliableLockStatus?: string } };
-    airConditioning?: {
-      carCapturedTimestamp?: string;
-      state?: string;
-      targetTemperature?: { value?: number; unit?: string };
-    };
   };
   errors?: { type: string }[];
 };

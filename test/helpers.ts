@@ -72,8 +72,6 @@ export function fullVehicleBody(o: BodyOptions) {
         primaryEngineRange: { engineType: "ELECTRIC", currentSoCInPercent: 57, remainingRangeInKm: 54 },
         secondaryEngineRange: { engineType: "GASOLINE", currentFuelLevelInPercent: 90, remainingRangeInKm: 530 },
       },
-      status: { carCapturedTimestamp: o.ts, overall: { locked: "YES", reliableLockStatus: "LOCKED" } },
-      airConditioning: { carCapturedTimestamp: o.ts, state: "OFF", targetTemperature: { value: 20, unit: "CELSIUS" } },
     },
     errors: [],
   };

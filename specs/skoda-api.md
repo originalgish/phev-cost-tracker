@@ -12,8 +12,6 @@ This is the external contract the tracker depends on, taken from the [OpenAPI sp
 - `429` has two problem types: `rate-limit-exceeded` and `vehicle-not-accepting-requests`. The second can mean the car's battery level is too low, so repeated `429`s are also worth checking for 12 V battery reasons.
 - Errors use `application/problem+json`. Its `instance` field contains the VIN.
 - `fuelStatus.totalRangeInKm` is the combined range. `fuelStatus` has `primaryEngineRange` and `secondaryEngineRange`, each with an `engineType` (`ELECTRIC`, `GASOLINE`, ...), so the fuel engine is found by type, not by position.
-- `status.overall.reliableLockStatus` is `LOCKED`, `UNLOCKED` or `UNKNOWN`. It reports `UNLOCKED` only for some vehicles, so `overall.locked` (`YES`, `NO`, `UNKNOWN`) is the fallback.
 - `charging.status.battery.remainingCruisingRangeInMeters` is in metres. `charging.settings.targetStateOfChargeInPercent` is the charge limit.
-- `airConditioning.targetTemperature` has a `value` and a `unit` (`CELSIUS` or `FAHRENHEIT`).
 - The API has no average consumption and no online or offline flag. Those My Škoda app values cannot be shown.
 - Whether `chargePowerInKw` is measured at the wall or the battery is not documented.
