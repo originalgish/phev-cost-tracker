@@ -2,7 +2,7 @@
 
 Answers one question: how much does it cost to charge my Škoda Kodiaq PHEV at home?
 
-The tracker polls the Škoda Connect API, turns the car's readings into charge sessions, and prices them from your tariff. It is single-user and self-hosted: you bring your own API key and run it on your own Cloudflare account. Home charging only.
+The tracker polls the Škoda Connect API, turns the car's readings into charge sessions, and prices them at your fixed electricity price. It is single-user and self-hosted: you bring your own API key and run it on your own Cloudflare account. Home charging only.
 
 **Status:** built locally through Phase 3. Not yet deployed. The deployment steps are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and need the owner's Cloudflare login and car.
 
@@ -10,24 +10,23 @@ The tracker polls the Škoda Connect API, turns the car's readings into charge s
 
 1. **Poll.** A cron runs every 5 minutes. A gate calls the API only when a poll is due: every 10 minutes while the plug is connected, 15 minutes otherwise. It backs off after rate limits, repeated auth failures and low quota.
 2. **Snapshot.** Each new car reading becomes one row: plug and charge state, power, state of charge (SoC), odometer and an at-home flag. No GPS coordinates are stored.
-3. **At home.** The parked position is compared with the home position captured once at setup, within `home_radius_m` (50 m by default). If the car reports no position, the last known value carries over while it stays plugged in; otherwise it is unknown.
+3. **At home.** The parked position is compared with the home position captured once at setup, within 50 m. If the car reports no position, the last known value carries over while it stays plugged in; otherwise it is unknown.
 4. **Session.** A session opens when the car is plugged in, charging and at home. It closes on unplug, when charging ends, or after 180 minutes of silence. Charges away from home are ignored.
-5. **Energy.** Each session gets two estimates: integrated charge power, and the change in SoC times usable battery size. Billed energy uses the power estimate, falls back to SoC if that has gaps, and can be set to prefer SoC.
-6. **Cost.** Billed kWh times (energy + transfer + electricity tax). VAT is added only to prices marked as excluding it. Cost stays empty until every price setting is filled in.
+5. **Energy.** Each session gets two estimates: integrated charge power, and the change in SoC times usable battery size. Billed energy uses the power estimate and falls back to SoC if that has gaps.
+6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config.ts](src/config.ts); a price change is a code change followed by **Recompute all costs**.
 7. **Alerts.** Optional webhook, for example ntfy.sh. Sent for a key expiring within 14 days, three auth or rate-limit failures in a row, or no successful poll for 6 hours. Each kind is sent at most once a day.
 
 ## Architecture
 
 - **Worker** in TypeScript with [Hono](https://hono.dev): `fetch` serves the API and dashboard, `scheduled` runs the poll.
-- **D1** (SQLite) stores snapshots, sessions, settings, poll state, errors and alert log. Schema: [migrations/0001_init.sql](migrations/0001_init.sql).
-- **Dashboard** is a static page in [public/](public/) with Chart.js: monthly cost, session list, data health and settings.
+- **D1** (SQLite) stores snapshots, sessions, the home position, poll state, errors and alert log. Schema: [migrations/0001_init.sql](migrations/0001_init.sql).
+- **Dashboard** is a static page in [public/](public/) with Chart.js: monthly cost, session list and data health.
 - **Access**: Cloudflare Access covers all traffic to the Worker. The Worker also verifies the Access JWT on `/api/*` and `/setup/*`.
 - **Free tier**: built for Workers and D1 free-tier limits, including 10 ms of CPU per invocation. CPU time is checked after deployment.
 
 | Route | Purpose |
 |---|---|
-| `GET /api/health` | Poll status, key expiry, quota and recent errors |
-| `GET`, `PUT /api/settings` | Read and change settings. The home position is never returned |
+| `GET /api/health` | Poll status, whether home is set, key expiry, quota and recent errors. The home position is never returned |
 | `POST /setup/home` | Store the car's current parked position as home |
 | `GET /api/months` | Monthly totals, newest first |
 | `GET /api/sessions?month=YYYY-MM` | Sessions in one month |

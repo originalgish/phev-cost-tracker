@@ -1,3 +1,4 @@
+import { POLL_INTERVAL_IDLE_MIN, POLL_INTERVAL_PLUGGED_MIN } from "./config";
 import { nextNotBefore, shouldPoll } from "./gate";
 import { toSample } from "./sample";
 import { sessionWrites } from "./session-store";
@@ -71,8 +72,8 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
     lastPollAt: state.last_poll_at,
     notBefore: state.not_before,
     lastPlugState: state.last_plug_state,
-    pluggedIntervalMin: settings.pluggedIntervalMin,
-    idleIntervalMin: settings.idleIntervalMin,
+    pluggedIntervalMin: POLL_INTERVAL_PLUGGED_MIN,
+    idleIntervalMin: POLL_INTERVAL_IDLE_MIN,
   });
   if (!due) return "skipped";
 
@@ -82,7 +83,7 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
     await db.batch([
       ...failureWrites(db, state, result, nowSec),
       db.prepare("UPDATE poll_state SET last_poll_at = ? WHERE id = 1").bind(nowSec),
-      ...(await sessionWrites(db, null, nowSec, settings, env.TIMEZONE)),
+      ...(await sessionWrites(db, null, nowSec, env.TIMEZONE)),
     ]);
     return "error";
   }
@@ -115,7 +116,7 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
          last_plug_state = COALESCE(?, last_plug_state), last_at_home = ? WHERE id = 1`,
       )
       .bind(nowSec, nowSec, isNew ? sample.capturedAt : null, sample?.plugState ?? null, lastAtHome),
-    ...(await sessionWrites(db, isNew ? sample : null, nowSec, settings, env.TIMEZONE)),
+    ...(await sessionWrites(db, isNew ? sample : null, nowSec, env.TIMEZONE)),
   );
   await db.batch(writes);
   if (sample === null) return "partial";

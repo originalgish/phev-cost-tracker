@@ -4,7 +4,7 @@
 
 Phase: 1. Verified by: test.
 
-When the car reports `PARKED` with coordinates and a home position is set, `at_home` shall be true if the distance to home is at most `home_radius_m` (default 50), otherwise false.
+When the car reports `PARKED` with coordinates and a home position is set, `at_home` shall be true if the distance to home is at most 50 m, otherwise false.
 
 ### HOME-2: Unknown location
 

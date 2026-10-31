@@ -1,3 +1,4 @@
+import { HOME_RADIUS_M } from "./config";
 import { distanceM } from "./geo";
 import type { Settings } from "./settings";
 import type { ParkingPosition, VehicleResponse } from "./skoda";
@@ -17,7 +18,7 @@ export type PreviousPlace = { plugState: string | null; atHome: number | null };
 export function resolveAtHome(parking: ParkingPosition | undefined, s: Settings, plugState: string | null, prev: PreviousPlace): boolean | null {
   const gps = parking?.gpsCoordinates;
   if (parking?.state === "PARKED" && gps !== undefined && s.homeLat !== null && s.homeLon !== null) {
-    return distanceM(gps, { latitude: s.homeLat, longitude: s.homeLon }) <= s.homeRadiusM;
+    return distanceM(gps, { latitude: s.homeLat, longitude: s.homeLon }) <= HOME_RADIUS_M;
   }
   // A car that stayed plugged in cannot have moved.
   if (plugState === "CONNECTED" && prev.plugState === "CONNECTED" && prev.atHome !== null) {

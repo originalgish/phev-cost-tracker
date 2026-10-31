@@ -15,23 +15,13 @@ export async function resetDb(): Promise<void> {
     env.DB.prepare("DELETE FROM alert_log"),
     env.DB.prepare("DELETE FROM poll_state"),
     env.DB.prepare("INSERT INTO poll_state (id) VALUES (1)"),
-    env.DB.prepare(
-      "DELETE FROM settings WHERE key IN ('home_lat', 'home_lon', 'vat_percent', 'energy_price_includes_vat', 'transfer_price_includes_vat', 'electricity_tax_includes_vat')",
-    ),
-    env.DB.prepare("UPDATE settings SET value = '8' WHERE key = 'energy_price_c_per_kwh'"),
+    env.DB.prepare("DELETE FROM settings"),
   ]);
 }
 
-export async function setHomeAndPrices(): Promise<void> {
+export async function setHome(): Promise<void> {
   const put = (key: string, value: string) => env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(key, value);
-  await env.DB.batch([
-    put("home_lat", String(HOME.latitude)),
-    put("home_lon", String(HOME.longitude)),
-    put("vat_percent", "25"),
-    put("energy_price_includes_vat", "false"),
-    put("transfer_price_includes_vat", "true"),
-    put("electricity_tax_includes_vat", "true"),
-  ]);
+  await env.DB.batch([put("home_lat", String(HOME.latitude)), put("home_lon", String(HOME.longitude))]);
 }
 
 export type BodyOptions = { ts: string; state?: string; plug?: string; kw?: number; soc?: number; parking?: unknown };

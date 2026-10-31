@@ -30,7 +30,7 @@ When a session is open and the state is `CHARGING`, omitted or not recognised, a
 
 Phase: 2. Verified by: test.
 
-When a session is open and the car has sent nothing new for longer than `session_stale_min` (default 180), the tracker shall close the session with reason `stale`, ending at the last sample.
+When a session is open and the car has sent nothing new for longer than 180 minutes, the tracker shall close the session with reason `stale`, ending at the last sample.
 
 ### SES-6: Ignore old samples
 
@@ -48,13 +48,13 @@ For each interval between samples, the tracker shall add `(p1 + p2) / 2 × hours
 
 Phase: 2. Verified by: test.
 
-When an interval is longer than `max_gap_min` (default 45) or a power value is missing, the tracker shall add no energy for it and shall count one gap.
+When an interval is longer than 45 minutes or a power value is missing, the tracker shall add no energy for it and shall count one gap.
 
 ### SES-9: Energy from SoC
 
 Phase: 2. Verified by: test.
 
-The SoC-based energy shall be `(end_soc − start_soc) / 100 × battery_usable_kwh`, never below zero. `end_soc` is the highest SoC seen in the session. If the first sample has no SoC, `start_soc` is the first SoC seen.
+The SoC-based energy shall be `(end_soc − start_soc) / 100 × 20`, never below zero. `end_soc` is the highest SoC seen in the session. If the first sample has no SoC, `start_soc` is the first SoC seen.
 
 ### SES-10: Month
 

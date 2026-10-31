@@ -1,27 +1,27 @@
 # Cost
 
-All prices are settings in cents per kWh. None are hard-coded in logic.
+The only price is the fixed-term electricity contract's energy price: 7.87 c/kWh, VAT 25.5 % included, fixed until 2028-02-02. It is a constant in `src/config.ts`, not a setting. The contract has no per-kWh transfer or tax line, and its monthly fee does not depend on charging, so neither is part of session cost.
 
-### COST-1: Cost by component
+### COST-1: Cost
 
 Phase: 2. Verified by: test.
 
-Each session's energy, transfer and tax cost shall be `kWh × price`. VAT at `vat_percent` shall be added only to a component whose `*_includes_vat` flag is false. The total is the sum of the three.
+Each session's cost shall be billed kWh × 7.87 c.
 
 ### COST-2: Billed energy
 
 Phase: 2. Verified by: test.
 
-Billed energy shall come from `cost_energy_source` (default `power`). The power estimate is usable only when the session has no gaps and its energy is above zero. If the preferred source is unusable, the tracker shall use the other. If neither is usable, billed energy is empty.
+Billed energy shall be the power estimate when it is usable, which means the session has no gaps and its energy is above zero. Otherwise it shall be the SoC estimate. If neither is usable, billed energy and cost are empty.
 
 ### COST-3: Incomplete prices
 
-Phase: 2. Verified by: test.
+Phase: 2. Verified by: manual.
 
-While any price, `*_includes_vat` flag or `vat_percent` is unset, cost shall stay empty and energy shall still be recorded.
+Removed: the price is a constant, so it cannot be incomplete.
 
 ### COST-4: Recompute
 
 Phase: 2. Verified by: test.
 
-Recomputing shall apply the current prices, `battery_usable_kwh` and `cost_energy_source` to every closed session.
+Recomputing shall apply the current price and battery size to every closed session.

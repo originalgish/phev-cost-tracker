@@ -11,9 +11,7 @@
   --banner-text: #6b4300;
   --error-bg: #fde3e1;
   --error-text: #8a1c14;
-  --energy: #2563eb;
-  --transfer: #f59e0b;
-  --tax: #10b981;
+  --cost: #2563eb;
   --open: #0f766e;
 }
 
@@ -30,9 +28,7 @@
     --banner-text: #fde7a6;
     --error-bg: #3d1a18;
     --error-text: #fbb4ae;
-    --energy: #60a5fa;
-    --transfer: #fbbf24;
-    --tax: #34d399;
+    --cost: #60a5fa;
     --open: #5eead4;
   }
 }
@@ -107,7 +103,6 @@ p {
 }
 
 select,
-input,
 button {
   font: inherit;
   color: var(--text);
@@ -220,28 +215,8 @@ tr.open td {
   margin: 0;
 }
 
-.field {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 160px);
-  gap: 8px;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.field input,
-.field select {
-  width: 100%;
-}
-
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-@media (max-width: 480px) {
-  .field {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }

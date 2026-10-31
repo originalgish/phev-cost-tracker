@@ -1,11 +1,11 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pollOnce } from "../src/poll";
-import { AWAY, T0, mockApiSequence, resetDb, setHomeAndPrices, vehicleBody } from "./helpers";
+import { AWAY, T0, mockApiSequence, resetDb, setHome, vehicleBody } from "./helpers";
 
 beforeEach(async () => {
   await resetDb();
-  await setHomeAndPrices();
+  await setHome();
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -30,20 +30,7 @@ describe("charge flow", () => {
     expect(row?.kwh_by_power).toBeCloseTo(1.5, 6);
     expect(row?.kwh_by_soc).toBeCloseTo(1.6, 6);
     expect(row?.kwh_source).toBe("power");
-    expect(row?.cost_energy_c).toBeCloseTo(15, 6); // 1.5 kWh at 8 c + 25 % VAT
-    expect(row?.cost_total_c).toBeCloseTo(15, 6);
-  });
-  it("COST-3 leaves cost empty until prices are complete", async () => {
-    await env.DB.prepare("DELETE FROM settings WHERE key = 'vat_percent'").run();
-    mockApiSequence([
-      vehicleBody({ ts: "2026-10-31T22:00Z", state: "CHARGING", kw: 3.6, soc: 20 }),
-      vehicleBody({ ts: "2026-10-31T22:10Z", state: "READY_FOR_CHARGING", soc: 22 }),
-    ]);
-    await pollOnce(env, T0);
-    await pollOnce(env, T0 + 600);
-    const row = await env.DB.prepare("SELECT status, kwh_used, cost_total_c FROM charge_session").first<Record<string, number | null>>();
-    expect(row?.kwh_used).toBeCloseTo(0.3, 6);
-    expect(row?.cost_total_c).toBeNull();
+    expect(row?.cost_c).toBeCloseTo(11.805, 6); // 1.5 kWh at 7.87 c
   });
   it("SES-1 HOME-3 opens a session when position is unknown but the car stayed plugged in", async () => {
     mockApiSequence([

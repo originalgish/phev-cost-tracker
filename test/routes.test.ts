@@ -38,23 +38,28 @@ describe("SEC-3 dev bypass", () => {
 });
 
 describe("SEC-2 cross-site requests", () => {
-  const body = { vat_percent: 1 };
+  const recompute = (headers: Record<string, string>) => send("POST", "/api/sessions/recompute-cost", headers);
+  const insertUncosted = () =>
+    env.DB.prepare("INSERT INTO charge_session (status, started_at, local_month, last_sample_at, kwh_by_power) VALUES ('closed', 1, '2026-10', 1, 10)").run();
+  const cost = async () => (await env.DB.prepare("SELECT cost_c FROM charge_session").first<{ cost_c: number | null }>())?.cost_c;
 
   it("rejects JSON from another origin", async () => {
     mockFetch(() => new Response("{}"));
-    const res = await send("PUT", "/api/settings", { ...(await authedHeaders()), Origin: "https://evil.example" }, body);
-    expect(res.status).toBe(403);
-    expect((await loadSettings(env.DB)).prices).toBeNull();
-    expect(await env.DB.prepare("SELECT value FROM settings WHERE key = 'vat_percent'").first()).toBeNull();
+    await insertUncosted();
+    expect((await recompute({ ...(await authedHeaders()), Origin: "https://evil.example" })).status).toBe(403);
+    expect(await cost()).toBeNull();
   });
   it.each(["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"])("rejects %s from the same origin", async (type) => {
     mockFetch(() => new Response("{}"));
-    const res = await send("PUT", "/api/settings", { ...(await authedHeaders()), "content-type": type, Origin: "https://x" }, body);
-    expect(res.status).toBe(403);
+    await insertUncosted();
+    expect((await recompute({ ...(await authedHeaders()), "content-type": type, Origin: "https://x" })).status).toBe(403);
+    expect(await cost()).toBeNull();
   });
   it("accepts JSON from the same origin", async () => {
     mockFetch(() => new Response("{}"));
-    expect((await send("PUT", "/api/settings", { ...(await authedHeaders()), Origin: "https://x" }, body)).status).toBe(200);
+    await insertUncosted();
+    expect((await recompute({ ...(await authedHeaders()), Origin: "https://x" })).status).toBe(200);
+    expect(await cost()).toBeCloseTo(78.7, 6);
   });
 });
 
@@ -69,42 +74,20 @@ describe("API-1 health", () => {
     mockFetch(() => new Response("{}"));
     await env.DB.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (5, 'auth', 401, 'api-key-expired')").run();
     const body = await (await get("/api/health", await authedHeaders())).json<Record<string, unknown>>();
-    expect(Object.keys(body).sort()).toEqual(["errors", "key_expires_at", "last_captured_at", "last_poll_at", "last_success_at", "not_before", "open_session", "rate_limit_remaining"]);
+    expect(Object.keys(body).sort()).toEqual(["errors", "home_set", "key_expires_at", "last_captured_at", "last_poll_at", "last_success_at", "not_before", "open_session", "rate_limit_remaining"]);
     expect(body.errors).toEqual([{ at: 5, kind: "auth", http_status: 401, problem_type: "api-key-expired" }]);
   });
 });
 
-describe("API-2 API-3 settings", () => {
-  it("changes nothing when one value is invalid", async () => {
+describe("API-1 home_set", () => {
+  it("is false until the home position is stored, and never exposes it", async () => {
     mockFetch(() => new Response("{}"));
     const h = await authedHeaders();
-    expect((await send("PUT", "/api/settings", h, { vat_percent: 25, home_lat: 1 })).status).toBe(400);
-    const got = await (await get("/api/settings", h)).json<{ values: Record<string, string | null> }>();
-    expect(got.values.vat_percent).toBeNull();
-  });
-  it("updates allowed keys and rejects bad values", async () => {
-    mockFetch(() => new Response("{}"));
-    const h = await authedHeaders();
-    expect((await send("PUT", "/api/settings", h, { vat_percent: 25.5, energy_price_includes_vat: true })).status).toBe(200);
-    expect((await send("PUT", "/api/settings", h, { vat_percent: "x" })).status).toBe(400);
-    expect((await send("PUT", "/api/settings", h, { home_lat: 1 })).status).toBe(400);
-    const got = await (await get("/api/settings", h)).json<{ values: Record<string, string | null>; home_set: boolean; prices_complete: boolean }>();
-    expect(got.values.vat_percent).toBe("25.5");
-    expect(got.home_set).toBe(false);
-    expect(got.prices_complete).toBe(false);
-    expect(JSON.stringify(got)).not.toContain("home_lat");
-  });
-  it("rejects a key inherited from Object.prototype", async () => {
-    mockFetch(() => new Response("{}"));
-    const h = await authedHeaders();
-    for (const key of ["toString", "constructor", "hasOwnProperty"]) {
-      expect((await send("PUT", "/api/settings", h, { [key]: 1 })).status).toBe(400);
-    }
-    expect(await env.DB.prepare("SELECT key FROM settings WHERE key IN ('toString', 'constructor', 'hasOwnProperty')").first()).toBeNull();
-  });
-  it("rejects a body that is not an object", async () => {
-    mockFetch(() => new Response("{}"));
-    expect((await send("PUT", "/api/settings", await authedHeaders(), [])).status).toBe(400);
+    expect((await (await get("/api/health", h)).json<{ home_set: boolean }>()).home_set).toBe(false);
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('home_lat', '1'), ('home_lon', '2')").run();
+    const body = await (await get("/api/health", h)).text();
+    expect(JSON.parse(body).home_set).toBe(true);
+    expect(body).not.toContain("home_lat");
   });
 });
 

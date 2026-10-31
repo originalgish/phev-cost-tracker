@@ -2,16 +2,15 @@ import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { recomputeCosts, rebuildSessions } from "../src/maintenance";
 import { pollOnce } from "../src/poll";
-import { loadSettings } from "../src/settings";
-import { T0, authedHeaders, mockApiSequence, mockFetch, resetDb, setHomeAndPrices, vehicleBody } from "./helpers";
+import { T0, authedHeaders, mockApiSequence, mockFetch, resetDb, setHome, vehicleBody } from "./helpers";
 
 beforeEach(async () => {
   await resetDb();
-  await setHomeAndPrices();
+  await setHome();
 });
 afterEach(() => vi.restoreAllMocks());
 
-const COLUMNS = "started_at, ended_at, end_reason, local_month, start_soc, end_soc, kwh_by_power, kwh_by_soc, cost_total_c";
+const COLUMNS = "started_at, ended_at, end_reason, local_month, start_soc, end_soc, kwh_by_power, kwh_by_soc, cost_c";
 
 async function liveCharge() {
   mockApiSequence([
@@ -28,29 +27,29 @@ describe("maintenance", () => {
     await liveCharge();
     const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).first();
     await env.DB.prepare("DELETE FROM charge_session").run();
-    expect(await rebuildSessions(env.DB, T0 - 3600, T0 + 7200, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect(await rebuildSessions(env.DB, T0 - 3600, T0 + 7200, env.TIMEZONE)).toBe(1);
     expect(await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).first()).toEqual(live);
   });
   it("SES-11 rebuilds a session whole when the range starts inside it", async () => {
     await liveCharge();
     const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all();
     const inside = Date.parse("2026-10-31T22:10Z") / 1000;
-    expect(await rebuildSessions(env.DB, inside, T0 + 7200, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect(await rebuildSessions(env.DB, inside, T0 + 7200, env.TIMEZONE)).toBe(1);
     expect((await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all()).results).toEqual(live.results);
   });
   it("SES-11 rebuilds a session whole when the range ends inside it", async () => {
     await liveCharge();
     const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all();
     const inside = Date.parse("2026-10-31T22:25Z") / 1000;
-    expect(await rebuildSessions(env.DB, T0 - 3600, inside, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect(await rebuildSessions(env.DB, T0 - 3600, inside, env.TIMEZONE)).toBe(1);
     expect((await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all()).results).toEqual(live.results);
   });
-  it("COST-4 recompute applies new prices", async () => {
+  it("COST-4 recompute applies the current price", async () => {
     await liveCharge();
-    await env.DB.prepare("UPDATE settings SET value = '20' WHERE key = 'energy_price_c_per_kwh'").run();
-    expect(await recomputeCosts(env.DB, await loadSettings(env.DB))).toBe(1);
-    const row = await env.DB.prepare("SELECT cost_total_c FROM charge_session").first<{ cost_total_c: number }>();
-    expect(row?.cost_total_c).toBeCloseTo(37.5, 6);
+    await env.DB.prepare("UPDATE charge_session SET cost_c = NULL, kwh_used = NULL").run();
+    expect(await recomputeCosts(env.DB)).toBe(1);
+    const row = await env.DB.prepare("SELECT cost_c FROM charge_session").first<{ cost_c: number }>();
+    expect(row?.cost_c).toBeCloseTo(11.805, 6);
   });
 });
 
@@ -61,7 +60,7 @@ describe("session routes", () => {
     await liveCharge();
     mockFetch(() => new Response("{}"));
     const months = await (await route("GET", "/api/months")).json<{ months: { month: string; sessions: number }[] }>();
-    expect(months.months[0]).toMatchObject({ month: "2026-11", sessions: 1 });
+    expect(months.months[0]).toMatchObject({ month: "2026-11", sessions: 1, kwh: expect.closeTo(1.5, 6), cost_c: expect.closeTo(11.805, 6) });
     const list = await (await route("GET", "/api/sessions?month=2026-11")).json<{ sessions: unknown[] }>();
     expect(list.sessions).toHaveLength(1);
     expect((await route("GET", "/api/sessions?month=bad")).status).toBe(400);

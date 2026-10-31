@@ -6,25 +6,25 @@ All routes here are subject to [security.md](security.md). Money is in cents and
 
 Phase: 1. Verified by: test.
 
-`GET /api/health` shall return `last_poll_at`, `last_success_at`, `last_captured_at`, `not_before`, `key_expires_at`, `rate_limit_remaining`, `open_session` and the 10 most recent `errors` (`at`, `kind`, `http_status`, `problem_type`).
+`GET /api/health` shall return `home_set`, `last_poll_at`, `last_success_at`, `last_captured_at`, `not_before`, `key_expires_at`, `rate_limit_remaining`, `open_session` and the 10 most recent `errors` (`at`, `kind`, `http_status`, `problem_type`).
 
 ### API-2: Read settings
 
-Phase: 1. Verified by: test.
+Phase: 1. Verified by: manual.
 
-`GET /api/settings` shall return `values` with every editable setting as a string or null, plus `home_set` and `prices_complete`.
+Removed: there are no editable settings. `home_set` is part of API-1.
 
 ### API-3: Write settings
 
-Phase: 1. Verified by: test.
+Phase: 1. Verified by: manual.
 
-`PUT /api/settings` shall accept a JSON object of editable settings, with numbers and booleans as JSON types, and return `{ updated }`. It shall answer `400` and change nothing if any key is not editable or any value is invalid. The home position is not editable here.
+Removed: there are no editable settings. The home position is set only by `POST /setup/home`.
 
 ### API-4: Months
 
 Phase: 2. Verified by: test.
 
-`GET /api/months` shall return `months`, newest first, at most 24, each with `month`, `sessions`, `kwh`, `energy_c`, `transfer_c`, `tax_c` and `total_c`, counting closed sessions only.
+`GET /api/months` shall return `months`, newest first, at most 24, each with `month`, `sessions`, `kwh` and `cost_c`, counting closed sessions only.
 
 ### API-5: Sessions
 

@@ -1,7 +1,7 @@
+import { MAX_GAP_MIN } from "./config";
 import { step, type OpenSession } from "./session";
 import { insertClosed, totalsFor } from "./session-store";
 import type { Sample } from "./sample";
-import type { Settings } from "./settings";
 
 type SnapshotRow = {
   captured_at: number;
@@ -34,7 +34,7 @@ async function wholeSessions(db: D1Database, from: number, to: number): Promise<
 
 // Replays snapshots in [from, to) through the same state machine as the live poll.
 // The caller must make sure no session is open.
-export async function rebuildSessions(db: D1Database, rangeFrom: number, rangeTo: number, s: Settings, timeZone: string): Promise<number> {
+export async function rebuildSessions(db: D1Database, rangeFrom: number, rangeTo: number, timeZone: string): Promise<number> {
   const [from, to] = await wholeSessions(db, rangeFrom, rangeTo);
   const { results } = await db
     .prepare("SELECT * FROM snapshot WHERE captured_at >= ? AND captured_at < ? ORDER BY captured_at")
@@ -43,28 +43,28 @@ export async function rebuildSessions(db: D1Database, rangeFrom: number, rangeTo
   const writes = [db.prepare("DELETE FROM charge_session WHERE started_at >= ? AND started_at < ?").bind(from, to)];
   let current: OpenSession | null = null;
   for (const row of results) {
-    const t = step(current, toSample(row), s.maxGapMin * 60);
+    const t = step(current, toSample(row), MAX_GAP_MIN * 60);
     if (t.kind === "open" || t.kind === "update") current = t.session;
     if (t.kind === "close") {
-      writes.push(insertClosed(db, t.session, t.endedAt, t.reason, s, timeZone));
+      writes.push(insertClosed(db, t.session, t.endedAt, t.reason, timeZone));
       current = null;
     }
   }
-  if (current !== null) writes.push(insertClosed(db, current, current.lastSampleAt, "stale", s, timeZone));
+  if (current !== null) writes.push(insertClosed(db, current, current.lastSampleAt, "stale", timeZone));
   await db.batch(writes);
   return writes.length - 1;
 }
 
 type ClosedRow = { id: number; kwh_by_power: number; gap_count: number; start_soc: number | null; end_soc: number | null };
 
-// Applies the current prices, battery size and energy source to every closed session.
-export async function recomputeCosts(db: D1Database, s: Settings): Promise<number> {
+// Applies the current price and battery size to every closed session.
+export async function recomputeCosts(db: D1Database): Promise<number> {
   const { results } = await db.prepare("SELECT id, kwh_by_power, gap_count, start_soc, end_soc FROM charge_session WHERE status = 'closed'").all<ClosedRow>();
   const writes = results.map((r) => {
-    const t = totalsFor(r.kwh_by_power, r.gap_count, r.start_soc, r.end_soc, s);
+    const t = totalsFor(r.kwh_by_power, r.gap_count, r.start_soc, r.end_soc);
     return db
-      .prepare("UPDATE charge_session SET kwh_by_soc = ?, kwh_used = ?, kwh_source = ?, cost_energy_c = ?, cost_transfer_c = ?, cost_tax_c = ?, cost_total_c = ? WHERE id = ?")
-      .bind(t.bySoc, t.kwh, t.source, t.cost?.energyC ?? null, t.cost?.transferC ?? null, t.cost?.taxC ?? null, t.cost?.totalC ?? null, r.id);
+      .prepare("UPDATE charge_session SET kwh_by_soc = ?, kwh_used = ?, kwh_source = ?, cost_c = ? WHERE id = ?")
+      .bind(t.bySoc, t.kwh, t.source, t.costC, r.id);
   });
   if (writes.length > 0) await db.batch(writes);
   return writes.length;

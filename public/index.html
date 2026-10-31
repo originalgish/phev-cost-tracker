@@ -33,7 +33,7 @@
 
         <h2>Monthly cost</h2>
         <div class="chart">
-          <canvas id="chart" role="img" aria-label="Stacked bars of energy, transfer and tax cost per month, in euros"></canvas>
+          <canvas id="chart" role="img" aria-label="Bars of charging cost per month, in euros"></canvas>
         </div>
 
         <h2>Sessions</h2>
@@ -46,10 +46,7 @@
                 <th>kWh by power</th>
                 <th>kWh by SoC</th>
                 <th>Billed kWh</th>
-                <th>Energy €</th>
-                <th>Transfer €</th>
-                <th>Tax €</th>
-                <th>Total €</th>
+                <th>Cost €</th>
                 <th>Notes</th>
               </tr>
             </thead>
@@ -77,14 +74,6 @@
           <tbody id="errors"></tbody>
         </table>
       </div>
-    </section>
-
-    <section class="card">
-      <h2>Settings</h2>
-      <form id="settings">
-        <div id="fields"></div>
-        <p><button type="submit">Save settings</button></p>
-      </form>
     </section>
 
     <section class="card">

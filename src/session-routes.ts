@@ -1,7 +1,6 @@
 import type { Hono } from "hono";
 import { recomputeCosts, rebuildSessions } from "./maintenance";
 import type { AppEnv } from "./routes";
-import { loadSettings } from "./settings";
 
 const MONTH = /^\d{4}-\d{2}$/;
 const SECONDS = /^\d+$/;
@@ -9,8 +8,7 @@ const SECONDS = /^\d+$/;
 export function registerSessionRoutes(app: Hono<AppEnv>): void {
   app.get("/api/months", async (c) => {
     const { results } = await c.env.DB.prepare(
-      `SELECT local_month AS month, COUNT(*) AS sessions, SUM(kwh_used) AS kwh, SUM(cost_energy_c) AS energy_c, SUM(cost_transfer_c) AS transfer_c,
-       SUM(cost_tax_c) AS tax_c, SUM(cost_total_c) AS total_c FROM charge_session WHERE status = 'closed' GROUP BY local_month ORDER BY local_month DESC LIMIT 24`,
+      `SELECT local_month AS month, COUNT(*) AS sessions, SUM(kwh_used) AS kwh, SUM(cost_c) AS cost_c FROM charge_session WHERE status = 'closed' GROUP BY local_month ORDER BY local_month DESC LIMIT 24`,
     ).all();
     return c.json({ months: results });
   });
@@ -23,7 +21,7 @@ export function registerSessionRoutes(app: Hono<AppEnv>): void {
   });
 
   app.post("/api/sessions/recompute-cost", async (c) => {
-    const updated = await recomputeCosts(c.env.DB, await loadSettings(c.env.DB));
+    const updated = await recomputeCosts(c.env.DB);
     return c.json({ updated });
   });
 
@@ -35,7 +33,7 @@ export function registerSessionRoutes(app: Hono<AppEnv>): void {
     if (!SECONDS.test(rawFrom) || !SECONDS.test(rawTo) || to <= from) return c.json({ error: "from and to must be unix seconds" }, 400);
     const open = await c.env.DB.prepare("SELECT id FROM charge_session WHERE status = 'open'").first();
     if (open !== null) return c.json({ error: "a session is open; retry after it closes" }, 409);
-    const sessions = await rebuildSessions(c.env.DB, from, to, await loadSettings(c.env.DB), c.env.TIMEZONE);
+    const sessions = await rebuildSessions(c.env.DB, from, to, c.env.TIMEZONE);
     return c.json({ sessions });
   });
 }

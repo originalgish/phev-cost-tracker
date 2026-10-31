@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { pollOnce } from "../src/poll";
-import { AWAY, T0, apiResponse, mockApiSequence, resetDb, setHomeAndPrices, vehicleBody } from "./helpers";
+import { AWAY, T0, apiResponse, mockApiSequence, resetDb, setHome, vehicleBody } from "./helpers";
 
 beforeEach(resetDb);
 afterEach(() => vi.restoreAllMocks());
@@ -10,7 +10,7 @@ const count = async (table: string) => (await env.DB.prepare(`SELECT count(*) AS
 
 describe("pollOnce", () => {
   it("POLL-4 stores one snapshot per car timestamp", async () => {
-    await setHomeAndPrices();
+    await setHome();
     mockApiSequence([
       vehicleBody({ ts: "2026-10-31T22:00Z", state: "READY_FOR_CHARGING" }),
       vehicleBody({ ts: "2026-10-31T22:00Z", state: "READY_FOR_CHARGING" }),
@@ -81,14 +81,14 @@ describe("pollOnce", () => {
     mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" })]);
     await pollOnce(env, T0);
     expect(await env.DB.prepare("SELECT at_home FROM snapshot").first()).toEqual({ at_home: null });
-    await setHomeAndPrices();
+    await setHome();
     vi.restoreAllMocks();
     mockApiSequence([vehicleBody({ ts: "2026-10-31T22:30Z", plug: "DISCONNECTED", parking: { state: "PARKED", gpsCoordinates: AWAY } })]);
     await pollOnce(env, T0 + 1800);
     expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 0 });
   });
   it("HOME-3 carries at_home over while the car stays plugged in", async () => {
-    await setHomeAndPrices();
+    await setHome();
     mockApiSequence([
       vehicleBody({ ts: "2026-10-31T22:00Z" }),
       vehicleBody({ ts: "2026-10-31T22:10Z", parking: { state: "IN_MOTION" } }),
@@ -98,7 +98,7 @@ describe("pollOnce", () => {
     expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 1 });
   });
   it("HOME-3 keeps at_home through a reading with no plug state", async () => {
-    await setHomeAndPrices();
+    await setHome();
     const noPlug = vehicleBody({ ts: "2026-10-31T22:10Z", parking: { state: "IN_MOTION" } });
     Object.assign(noPlug.vehicle.charging.status, { plugConnectionState: undefined });
     mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" }), noPlug, vehicleBody({ ts: "2026-10-31T22:20Z", parking: { state: "IN_MOTION" } })]);
@@ -106,7 +106,7 @@ describe("pollOnce", () => {
     expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 1 });
   });
   it("HOME-2 HOME-3 does not carry at_home across a drive", async () => {
-    await setHomeAndPrices();
+    await setHome();
     mockApiSequence([
       vehicleBody({ ts: "2026-10-31T22:00Z", plug: "DISCONNECTED" }),
       vehicleBody({ ts: "2026-10-31T22:15Z", plug: "DISCONNECTED", parking: { state: "IN_MOTION" } }),
@@ -129,7 +129,7 @@ describe("pollOnce", () => {
     expect(await env.DB.prepare("SELECT at FROM poll_error").all().then((r) => r.results)).toEqual([{ at: T0 }]);
   });
   it("SEC-5 never stores GPS coordinates", async () => {
-    await setHomeAndPrices();
+    await setHome();
     mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" })]);
     await pollOnce(env, T0);
     const row = await env.DB.prepare("SELECT * FROM snapshot").first();

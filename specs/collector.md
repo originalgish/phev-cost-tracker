@@ -1,12 +1,12 @@
 # Collector
 
-Timing and thresholds below are defaults. Those marked as settings are in `settings`.
+Timing and thresholds below are constants in `src/config.ts`.
 
 ### POLL-1: Polling cadence
 
 Phase: 1. Verified by: test.
 
-The tracker shall check every 5 minutes whether a poll is due. A poll is due when no poll has happened yet, or when the time since the last poll is at least `poll_interval_plugged_min` (default 10) if the plug was last known `CONNECTED`, otherwise `poll_interval_idle_min` (default 15). A check up to 60 seconds early still counts as due.
+The tracker shall check every 5 minutes whether a poll is due. A poll is due when no poll has happened yet, or when the time since the last poll is at least 10 minutes if the plug was last known `CONNECTED`, otherwise 15 minutes. A check up to 60 seconds early still counts as due.
 
 ### POLL-2: No call when not due
 
