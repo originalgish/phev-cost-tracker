@@ -4,18 +4,95 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PHEV Cost Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
-  <h1>PHEV Cost Tracker setup</h1>
-  <p><button id="home">Capture home position</button></p>
-  <pre id="out"></pre>
-  <script>
-    const out = document.getElementById("out");
-    const show = async (res) => { out.textContent = JSON.stringify(await res.json(), null, 2); };
-    document.getElementById("home").onclick = async () => {
-      show(await fetch("/setup/home", { method: "POST", headers: { "Content-Type": "application/json" } }));
-    };
-    fetch("/api/health").then(show);
-  </script>
+  <main>
+    <h1>PHEV Cost Tracker</h1>
+
+    <div id="banners"></div>
+    <p id="status" role="status" hidden></p>
+
+    <section class="card">
+      <div class="month-picker">
+        <label for="month">Month</label>
+        <select id="month"></select>
+      </div>
+      <p id="no-sessions" hidden>No charging sessions yet</p>
+
+      <div id="month-details" hidden>
+        <div class="stats">
+          <div class="stat"><span class="label">Total cost</span><span id="stat-cost" class="value">—</span></div>
+          <div class="stat"><span class="label">Energy</span><span id="stat-kwh" class="value">—</span></div>
+          <div class="stat"><span class="label">Average price</span><span id="stat-avg" class="value">—</span></div>
+          <div class="stat"><span class="label">Sessions</span><span id="stat-count" class="value">—</span></div>
+        </div>
+
+        <h2>Monthly cost</h2>
+        <div class="chart">
+          <canvas id="chart" role="img" aria-label="Stacked bars of energy, transfer and tax cost per month, in euros"></canvas>
+        </div>
+
+        <h2>Sessions</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Start</th>
+                <th>Duration</th>
+                <th>kWh by power</th>
+                <th>kWh by SoC</th>
+                <th>Billed kWh</th>
+                <th>Energy €</th>
+                <th>Transfer €</th>
+                <th>Tax €</th>
+                <th>Total €</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="sessions"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Data health</h2>
+      <dl class="health">
+        <dt>Last poll</dt><dd id="h-last-poll">—</dd>
+        <dt>Last success</dt><dd id="h-last-success">—</dd>
+        <dt>Last car data</dt><dd id="h-last-captured">—</dd>
+        <dt>API key expires</dt><dd id="h-key">—</dd>
+        <dt>Quota remaining</dt><dd id="h-quota">—</dd>
+      </dl>
+      <h3>Last 10 errors</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Kind</th><th>HTTP</th><th>Problem</th></tr>
+          </thead>
+          <tbody id="errors"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Settings</h2>
+      <form id="settings">
+        <div id="fields"></div>
+        <p><button type="submit">Save settings</button></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Actions</h2>
+      <div class="actions">
+        <button id="recompute" type="button">Recompute all costs</button>
+        <button id="home" type="button">Capture home position</button>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
