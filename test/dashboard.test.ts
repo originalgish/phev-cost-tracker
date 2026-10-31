@@ -25,3 +25,12 @@ describe("DASH-8 actions", () => {
     expect(html).not.toContain("Capture home position");
   });
 });
+
+describe("DASH-5 charging now", () => {
+  it("has a charging-now line outside the month details, so it shows with no months", async () => {
+    const html = await page("/");
+    const line = html.indexOf('id="charging-now"');
+    expect(line).toBeGreaterThan(-1);
+    expect(line).toBeLessThan(html.indexOf('id="month-details"'));
+  });
+});

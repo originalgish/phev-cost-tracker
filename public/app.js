@@ -74,8 +74,10 @@ function renderCar(car) {
   $("car-updated").textContent = newest > 0 ? `Updated ${when(newest)}` : "";
 }
 
-function openRow(o) {
-  return cells(["Charging now", "—", kwh(o.kwh_by_power), "—", "—", "—", `since ${when(o.started_at)}`], "open");
+function renderOpen() {
+  const o = health.open_session;
+  $("charging-now").hidden = !o;
+  if (o) $("charging-now").textContent = `Charging now · since ${when(o.started_at)} · ${kwh(o.kwh_by_power)} kWh by power`;
 }
 
 function closedRow(s) {
@@ -93,9 +95,7 @@ function closedRow(s) {
 async function loadSessions(month) {
   const { sessions } = await api(`/api/sessions?month=${month}`);
   const rows = [];
-  const open = health.open_session;
-  if (open) rows.push(openRow(open));
-  // The open session is shown above from the health data, so skip its row here.
+  // The open session is shown by renderOpen, so skip its row here.
   for (const s of sessions) if (s.status === "closed") rows.push(closedRow(s));
   $("sessions").replaceChildren(...(rows.length > 0 ? rows : [emptyRow("No sessions in this month.", 7)]));
 }
@@ -160,6 +160,7 @@ async function refresh() {
   health = h;
   renderCar(car);
   renderBanners();
+  renderOpen();
   await renderMonths(monthData.months);
 }
 
