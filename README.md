@@ -20,7 +20,7 @@ The tracker polls the Škoda Connect API, turns the car's readings into charge s
 
 - **Worker** in TypeScript with [Hono](https://hono.dev): `fetch` serves the API and dashboard, `scheduled` runs the poll.
 - **D1** (SQLite) stores snapshots, sessions, the home position, poll state, errors and alert log. Schema: [migrations/0001_init.sql](migrations/0001_init.sql).
-- **Dashboard** is a static page in [public/](public/) with Chart.js: monthly cost, session list and data health.
+- **Dashboard** is two static pages in [public/](public/): monthly cost and the session list with Chart.js on `/`, and data health on `/health`.
 - **Access**: Cloudflare Access covers all traffic to the Worker. The Worker also verifies the Access JWT on `/api/*` and `/setup/*`.
 - **Free tier**: built for Workers and D1 free-tier limits, including 10 ms of CPU per invocation. CPU time is checked after deployment.
 

@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 describe("SEC-9 page headers", () => {
-  it.each(["/", "/app.js", "/style.css", "/vendor/chart.umd.min.js"])("protects %s", async (path) => {
+  it.each(["/", "/health", "/app.js", "/health.js", "/common.js", "/style.css", "/vendor/chart.umd.min.js"])("protects %s", async (path) => {
     const res = await env.ASSETS.fetch(`https://x${path}`);
     expect(res.status).toBe(200);
     const csp = res.headers.get("Content-Security-Policy");

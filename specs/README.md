@@ -54,7 +54,7 @@ describe("SES-1 opening", () => { ... });
 | [api.md](api.md) | `API` | HTTP routes |
 | [security.md](security.md) | `SEC` | Access, secrets and privacy |
 | [alerts.md](alerts.md) | `ALERT` | Warnings to the owner |
-| [dashboard.md](dashboard.md) | `DASH` | The web page |
+| [dashboard.md](dashboard.md) | `DASH` | The web pages |
 | [operations.md](operations.md) | `OPS` | Running within the free tier |
 | [skoda-api.md](skoda-api.md) | none | Facts about the Škoda API |
 | [decisions.md](decisions.md) | none | Where the specs differ from `PLAN.md`, and why |

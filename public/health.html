@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data health · PHEV Cost Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script src="health.js" type="module"></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <h1>Data health</h1>
+      <a href="/">Dashboard</a>
+    </header>
+
+    <p id="status" role="status" hidden></p>
+
+    <section class="card">
+      <dl class="health">
+        <dt>Last poll</dt><dd id="h-last-poll">—</dd>
+        <dt>Last success</dt><dd id="h-last-success">—</dd>
+        <dt>Last car data</dt><dd id="h-last-captured">—</dd>
+        <dt>API key expires</dt><dd id="h-key">—</dd>
+        <dt>Quota remaining</dt><dd id="h-quota">—</dd>
+      </dl>
+      <h2>Last 10 errors</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Kind</th><th>HTTP</th><th>Problem</th></tr>
+          </thead>
+          <tbody id="errors"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
