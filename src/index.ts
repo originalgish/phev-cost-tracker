@@ -1,5 +1,8 @@
 import { pollOnce } from "./poll";
 import { app } from "./routes";
+import { registerSessionRoutes } from "./session-routes";
+
+registerSessionRoutes(app);
 
 export default {
   fetch: app.fetch,
