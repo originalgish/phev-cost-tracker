@@ -67,4 +67,22 @@ describe("charge flow", () => {
     await pollOnce(env, T0 + 200 * 60);
     expect(await env.DB.prepare("SELECT status, end_reason FROM charge_session").first()).toEqual({ status: "closed", end_reason: "stale" });
   });
+  it("SES-5 closes a silent session during an API outage", async () => {
+    mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z", state: "CHARGING", kw: 3.6 })]);
+    await pollOnce(env, T0);
+    vi.restoreAllMocks();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
+    await pollOnce(env, T0 + 200 * 60);
+    expect(await env.DB.prepare("SELECT status, end_reason FROM charge_session").first()).toEqual({ status: "closed", end_reason: "stale" });
+  });
+  it("SES-1 HOME-3 ignores a charge after a drive when the car reports no position", async () => {
+    mockApiSequence([
+      vehicleBody({ ts: "2026-10-31T22:00Z", plug: "DISCONNECTED" }),
+      vehicleBody({ ts: "2026-10-31T22:15Z", plug: "DISCONNECTED", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:30Z", state: "READY_FOR_CHARGING", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:45Z", state: "CHARGING", kw: 11, parking: { state: "IN_MOTION" } }),
+    ]);
+    for (let i = 0; i < 4; i++) await pollOnce(env, T0 + i * 900);
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM charge_session").first()).toEqual({ n: 0 });
+  });
 });

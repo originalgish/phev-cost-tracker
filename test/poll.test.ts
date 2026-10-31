@@ -33,9 +33,11 @@ describe("pollOnce", () => {
   });
   it("POLL-2 does not call the API when the gate is closed", async () => {
     await env.DB.prepare("UPDATE poll_state SET last_poll_at = ?").bind(T0).run();
+    const before = await env.DB.prepare("SELECT * FROM poll_state").first();
     const f = vi.spyOn(globalThis, "fetch");
     expect(await pollOnce(env, T0 + 300)).toBe("skipped");
     expect(f).not.toHaveBeenCalled();
+    expect(await env.DB.prepare("SELECT * FROM poll_state").first()).toEqual(before);
   });
   it("POLL-6 POLL-8 honours Retry-After and logs a 429", async () => {
     const body = { type: "https://public.api.connect.skoda-auto.cz/problems/rate-limit-exceeded" };
@@ -64,6 +66,17 @@ describe("pollOnce", () => {
     expect(await env.DB.prepare("SELECT kind, problem_type FROM poll_error").first()).toEqual({ kind: "partial", problem_type: "CHARGING_UNAVAILABLE" });
     expect(await count("snapshot")).toBe(0);
   });
+  it("POLL-5 POLL-8 survives a 200 with no vehicle", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ errors: [{ type: "VEHICLE_UNAVAILABLE" }] }));
+    expect(await pollOnce(env, T0)).toBe("partial");
+    expect(await env.DB.prepare("SELECT problem_type FROM poll_error").first()).toEqual({ problem_type: "VEHICLE_UNAVAILABLE" });
+    expect(await env.DB.prepare("SELECT last_poll_at FROM poll_state").first()).toEqual({ last_poll_at: T0 });
+  });
+  it("POLL-5 POLL-8 survives a null body", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse(null));
+    expect(await pollOnce(env, T0)).toBe("partial");
+    expect(await env.DB.prepare("SELECT problem_type FROM poll_error").first()).toEqual({ problem_type: "missing-charging" });
+  });
   it("HOME-1 HOME-2 stores at_home 0 away and NULL before home is set", async () => {
     mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" })]);
     await pollOnce(env, T0);
@@ -84,9 +97,34 @@ describe("pollOnce", () => {
     await pollOnce(env, T0 + 600);
     expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 1 });
   });
+  it("HOME-3 keeps at_home through a reading with no plug state", async () => {
+    await setHomeAndPrices();
+    const noPlug = vehicleBody({ ts: "2026-10-31T22:10Z", parking: { state: "IN_MOTION" } });
+    Object.assign(noPlug.vehicle.charging.status, { plugConnectionState: undefined });
+    mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" }), noPlug, vehicleBody({ ts: "2026-10-31T22:20Z", parking: { state: "IN_MOTION" } })]);
+    for (let i = 0; i < 3; i++) await pollOnce(env, T0 + i * 600);
+    expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 1 });
+  });
+  it("HOME-2 HOME-3 does not carry at_home across a drive", async () => {
+    await setHomeAndPrices();
+    mockApiSequence([
+      vehicleBody({ ts: "2026-10-31T22:00Z", plug: "DISCONNECTED" }),
+      vehicleBody({ ts: "2026-10-31T22:15Z", plug: "DISCONNECTED", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:30Z", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:45Z", parking: { state: "IN_MOTION" } }),
+    ]);
+    for (let i = 0; i < 4; i++) await pollOnce(env, T0 + i * 900);
+    expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: null });
+  });
   it("POLL-11 deletes logged errors after 30 days", async () => {
     await env.DB.prepare("INSERT INTO poll_error (at, kind) VALUES (?, 'server')").bind(T0 - 31 * 86400).run();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
+    await pollOnce(env, T0);
+    expect(await env.DB.prepare("SELECT at FROM poll_error").all().then((r) => r.results)).toEqual([{ at: T0 }]);
+  });
+  it("POLL-11 also deletes them when logging a partial response", async () => {
+    await env.DB.prepare("INSERT INTO poll_error (at, kind) VALUES (?, 'server')").bind(T0 - 31 * 86400).run();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ vehicle: {}, errors: [{ type: "CHARGING_UNAVAILABLE" }] }));
     await pollOnce(env, T0);
     expect(await env.DB.prepare("SELECT at FROM poll_error").all().then((r) => r.results)).toEqual([{ at: T0 }]);
   });

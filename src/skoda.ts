@@ -7,7 +7,7 @@ export type ParkingPosition = {
 };
 
 export type VehicleResponse = {
-  vehicle: {
+  vehicle?: {
     parkingPosition?: ParkingPosition;
     odometer?: { mileageInKm: number };
     charging?: {
@@ -35,6 +35,8 @@ export type ErrorKind = "auth" | "rate_limit" | "server" | "network";
 export type FetchResult =
   | { ok: true; body: VehicleResponse; meta: RateMeta }
   | { ok: false; kind: ErrorKind; status: number | null; problemType: string | null; meta: RateMeta };
+
+export type FetchFailure = Extract<FetchResult, { ok: false }>;
 
 const EMPTY_META: RateMeta = { keyExpiresAt: null, rateRemaining: null, rateResetSeconds: null, retryAfterSeconds: null };
 
@@ -93,7 +95,7 @@ export async function fetchVehicle(env: Env, parts: string[], nowSec: number): P
     return { ok: false, kind: classify(res.status), status: res.status, problemType: await problemSlug(res), meta };
   }
   try {
-    return { ok: true, body: await res.json<VehicleResponse>(), meta };
+    return { ok: true, body: (await res.json<VehicleResponse | null>()) ?? {}, meta };
   } catch {
     return { ok: false, kind: "server", status: res.status, problemType: "invalid-json", meta };
   }

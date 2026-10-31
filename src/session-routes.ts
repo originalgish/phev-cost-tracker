@@ -4,6 +4,7 @@ import type { AppEnv } from "./routes";
 import { loadSettings } from "./settings";
 
 const MONTH = /^\d{4}-\d{2}$/;
+const SECONDS = /^\d+$/;
 
 export function registerSessionRoutes(app: Hono<AppEnv>): void {
   app.get("/api/months", async (c) => {
@@ -27,9 +28,11 @@ export function registerSessionRoutes(app: Hono<AppEnv>): void {
   });
 
   app.post("/api/sessions/rebuild", async (c) => {
-    const from = Number(c.req.query("from"));
-    const to = Number(c.req.query("to"));
-    if (!Number.isInteger(from) || !Number.isInteger(to) || to <= from) return c.json({ error: "from and to must be unix seconds" }, 400);
+    const rawFrom = c.req.query("from") ?? "";
+    const rawTo = c.req.query("to") ?? "";
+    const from = Number(rawFrom);
+    const to = Number(rawTo);
+    if (!SECONDS.test(rawFrom) || !SECONDS.test(rawTo) || to <= from) return c.json({ error: "from and to must be unix seconds" }, 400);
     const open = await c.env.DB.prepare("SELECT id FROM charge_session WHERE status = 'open'").first();
     if (open !== null) return c.json({ error: "a session is open; retry after it closes" }, 409);
     const sessions = await rebuildSessions(c.env.DB, from, to, await loadSettings(c.env.DB), c.env.TIMEZONE);

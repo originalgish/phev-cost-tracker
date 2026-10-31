@@ -1,7 +1,6 @@
 import { Hono } from "hono";
-import { csrf } from "hono/csrf";
-import { requireAccess } from "./auth";
-import { loadPollState } from "./poll";
+import { rejectCrossSite, requireAccess } from "./auth";
+import { failureWrites, loadPollState, successWrite } from "./poll";
 import { loadSettings } from "./settings";
 import { fetchVehicle } from "./skoda";
 
@@ -30,8 +29,8 @@ const EDITABLE: Record<string, (v: unknown) => string | null> = {
 
 export const app = new Hono<AppEnv>();
 
-app.use("/api/*", csrf(), requireAccess);
-app.use("/setup/*", csrf(), requireAccess);
+app.use("/api/*", rejectCrossSite, requireAccess);
+app.use("/setup/*", rejectCrossSite, requireAccess);
 
 app.get("/api/health", async (c) => {
   const st = await loadPollState(c.env.DB);
@@ -59,10 +58,11 @@ app.get("/api/settings", async (c) => {
 
 app.put("/api/settings", async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (body === null || typeof body !== "object") return c.json({ error: "JSON object required" }, 400);
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "JSON object required" }, 400);
   const writes: D1PreparedStatement[] = [];
   for (const [key, value] of Object.entries(body)) {
-    const encoded = EDITABLE[key]?.(value) ?? null;
+    // hasOwn, because a key like `toString` would otherwise find Object.prototype.
+    const encoded = Object.hasOwn(EDITABLE, key) ? (EDITABLE[key]?.(value) ?? null) : null;
     if (encoded === null) return c.json({ error: `invalid value for ${key}` }, 400);
     writes.push(c.env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(key, encoded));
   }
@@ -71,16 +71,28 @@ app.put("/api/settings", async (c) => {
 });
 
 app.post("/setup/home", async (c) => {
-  const settings = await loadSettings(c.env.DB);
+  const db = c.env.DB;
+  const settings = await loadSettings(db);
   if (settings.homeLat !== null && c.req.query("force") !== "1") return c.json({ error: "home already set; pass force=1 to replace it" }, 409);
-  const result = await fetchVehicle(c.env, ["parkingPosition"], Math.floor(Date.now() / 1000));
-  if (!result.ok) return c.json({ error: `Škoda API error: ${result.kind}` }, 502);
-  const parking = result.body.vehicle.parkingPosition;
-  if (parking?.state !== "PARKED" || parking.gpsCoordinates === undefined) return c.json({ error: "car is not reporting a parked position" }, 409);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const state = await loadPollState(db);
+  if (state.not_before !== null && nowSec < state.not_before) return c.json({ error: "Škoda API calls are paused; try again later" }, 409);
+  const result = await fetchVehicle(c.env, ["parkingPosition"], nowSec);
+  if (!result.ok) {
+    await db.batch(failureWrites(db, state, result, nowSec));
+    return c.json({ error: `Škoda API error: ${result.kind}` }, 502);
+  }
+  const answered = successWrite(db, result.meta, nowSec);
+  const parking = result.body.vehicle?.parkingPosition;
+  if (parking?.state !== "PARKED" || parking.gpsCoordinates === undefined) {
+    await answered.run();
+    return c.json({ error: "car is not reporting a parked position" }, 409);
+  }
   const { latitude, longitude } = parking.gpsCoordinates;
-  await c.env.DB.batch([
-    c.env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lat', ?)").bind(String(latitude)),
-    c.env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lon', ?)").bind(String(longitude)),
+  await db.batch([
+    answered,
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lat', ?)").bind(String(latitude)),
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lon', ?)").bind(String(longitude)),
   ]);
   return c.json({ home_set: true });
 });

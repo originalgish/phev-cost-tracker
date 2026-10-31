@@ -28,9 +28,11 @@ export function shouldPoll(nowSec: number, g: GateInput): boolean {
 }
 
 export function nextNotBefore(nowSec: number, b: BackoffInput): number | null {
-  if (b.failureKind === "rate_limit") return nowSec + (b.retryAfterSeconds ?? DEFAULT_RATE_LIMIT_BACKOFF_SECONDS);
-  if (b.failureKind !== null && b.retryAfterSeconds !== null) return nowSec + b.retryAfterSeconds;
-  if (b.failureKind === "auth" && b.authFailures >= AUTH_FAILURE_LIMIT) return nowSec + AUTH_BACKOFF_SECONDS;
-  if (b.rateRemaining !== null && b.rateRemaining <= 1 && b.rateResetSeconds !== null) return nowSec + b.rateResetSeconds;
-  return null;
+  // Several reasons can apply at once, so the longest pause wins.
+  const waits: number[] = [];
+  if (b.failureKind === "rate_limit") waits.push(b.retryAfterSeconds ?? DEFAULT_RATE_LIMIT_BACKOFF_SECONDS);
+  else if (b.failureKind !== null && b.retryAfterSeconds !== null) waits.push(b.retryAfterSeconds);
+  if (b.failureKind === "auth" && b.authFailures >= AUTH_FAILURE_LIMIT) waits.push(AUTH_BACKOFF_SECONDS);
+  if (b.rateRemaining !== null && b.rateRemaining <= 1 && b.rateResetSeconds !== null) waits.push(b.rateResetSeconds);
+  return waits.length === 0 ? null : nowSec + Math.max(...waits);
 }

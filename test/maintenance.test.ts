@@ -31,6 +31,20 @@ describe("maintenance", () => {
     expect(await rebuildSessions(env.DB, T0 - 3600, T0 + 7200, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
     expect(await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).first()).toEqual(live);
   });
+  it("SES-11 rebuilds a session whole when the range starts inside it", async () => {
+    await liveCharge();
+    const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all();
+    const inside = Date.parse("2026-10-31T22:10Z") / 1000;
+    expect(await rebuildSessions(env.DB, inside, T0 + 7200, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect((await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all()).results).toEqual(live.results);
+  });
+  it("SES-11 rebuilds a session whole when the range ends inside it", async () => {
+    await liveCharge();
+    const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all();
+    const inside = Date.parse("2026-10-31T22:25Z") / 1000;
+    expect(await rebuildSessions(env.DB, T0 - 3600, inside, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect((await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all()).results).toEqual(live.results);
+  });
   it("COST-4 recompute applies new prices", async () => {
     await liveCharge();
     await env.DB.prepare("UPDATE settings SET value = '20' WHERE key = 'energy_price_c_per_kwh'").run();
@@ -52,6 +66,25 @@ describe("session routes", () => {
     expect(list.sessions).toHaveLength(1);
     expect((await route("GET", "/api/sessions?month=bad")).status).toBe(400);
   });
+  const insertSession = (status: string, startedAt: number, month: string) =>
+    env.DB.prepare("INSERT INTO charge_session (status, started_at, local_month, last_sample_at) VALUES (?, ?, ?, ?)").bind(status, startedAt, month, startedAt);
+
+  it("API-4 counts closed sessions only, newest first, at most 24 months", async () => {
+    const month = (i: number) => `${2024 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
+    await env.DB.batch(Array.from({ length: 25 }, (_, i) => insertSession("closed", i + 1, month(i))));
+    await insertSession("open", 100, "2027-01").run();
+    mockFetch(() => new Response("{}"));
+    const { months } = await (await route("GET", "/api/months")).json<{ months: { month: string }[] }>();
+    expect(months).toHaveLength(24);
+    expect(months[0]?.month).toBe("2026-01");
+    expect(months[23]?.month).toBe("2024-02");
+  });
+  it("API-5 lists a month's sessions newest first", async () => {
+    await env.DB.batch([insertSession("closed", 10, "2026-10"), insertSession("closed", 20, "2026-10"), insertSession("closed", 30, "2026-09")]);
+    mockFetch(() => new Response("{}"));
+    const { sessions } = await (await route("GET", "/api/sessions?month=2026-10")).json<{ sessions: { started_at: number }[] }>();
+    expect(sessions.map((s) => s.started_at)).toEqual([20, 10]);
+  });
   it("API-6 recomputes and rebuilds", async () => {
     await liveCharge();
     mockFetch(() => new Response("{}"));
@@ -67,5 +100,7 @@ describe("session routes", () => {
   it("API-6 validates the rebuild range", async () => {
     mockFetch(() => new Response("{}"));
     expect((await route("POST", "/api/sessions/rebuild?from=100&to=0")).status).toBe(400);
+    expect((await route("POST", "/api/sessions/rebuild?from=&to=100")).status).toBe(400);
+    expect((await route("POST", "/api/sessions/rebuild?to=100")).status).toBe(400);
   });
 });

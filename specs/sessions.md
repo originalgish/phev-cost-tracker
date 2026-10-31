@@ -66,4 +66,4 @@ A session shall belong to the calendar month, in `TIMEZONE`, of its start time.
 
 Phase: 2. Verified by: test.
 
-Rebuilding a time range shall replace its sessions with the result of replaying stored snapshots through the same rules. It cannot detect SES-5, so a session still open at the end of the data closes as `stale` at its last sample.
+Rebuilding a time range shall replace its sessions with the result of replaying stored snapshots through the same rules. A stored session that crosses either end of the range shall be rebuilt whole, so it is neither split nor counted twice. It cannot detect SES-5, so a session still open at the end of the data closes as `stale` at its last sample.

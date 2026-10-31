@@ -22,4 +22,4 @@ When the car reports no coordinates, and the plug is `CONNECTED` now and was `CO
 
 Phase: 1. Verified by: test.
 
-`POST /setup/home` shall read the car's position and store it as home, and shall spend one API request doing so. It shall answer `409` if the car is not reporting a parked position, and `409` if home is already set unless `force=1` is passed.
+`POST /setup/home` shall read the car's position and store it as home, and shall spend one API request doing so. It shall answer `409` if the car is not reporting a parked position, and `409` if home is already set unless `force=1` is passed. It shall answer `409` without calling the API while the current time is before `not_before`. Its response shall be handled as in POLL-6 to POLL-10.

@@ -24,4 +24,13 @@ describe("nextNotBefore", () => {
     expect(nextNotBefore(100, { ...ok, failureKind: "auth", authFailures: 3 })).toBe(3700);
   });
   it("POLL-7 pauses when the quota is nearly gone", () => expect(nextNotBefore(100, { ...ok, rateRemaining: 1 })).toBe(200));
+  it("POLL-7 keeps the quota pause when Retry-After is shorter", () => {
+    expect(nextNotBefore(100, { ...ok, failureKind: "server", retryAfterSeconds: 30, rateRemaining: 0, rateResetSeconds: 1800 })).toBe(1900);
+  });
+  it("POLL-7 keeps the auth pause when Retry-After is shorter", () => {
+    expect(nextNotBefore(100, { ...ok, failureKind: "auth", retryAfterSeconds: 30, authFailures: 3 })).toBe(3700);
+  });
+  it("POLL-6 POLL-7 keeps Retry-After when it is the longest pause", () => {
+    expect(nextNotBefore(100, { ...ok, failureKind: "rate_limit", retryAfterSeconds: 7200, rateRemaining: 0, rateResetSeconds: 60 })).toBe(7300);
+  });
 });

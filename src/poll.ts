@@ -2,7 +2,7 @@ import { nextNotBefore, shouldPoll } from "./gate";
 import { toSample } from "./sample";
 import { sessionWrites } from "./session-store";
 import { loadSettings } from "./settings";
-import { fetchVehicle } from "./skoda";
+import { fetchVehicle, type FetchFailure, type RateMeta } from "./skoda";
 
 const POLL_PARTS = ["charging", "parkingPosition", "odometer"];
 const ERROR_RETENTION_SECONDS = 30 * 86400;
@@ -28,6 +28,41 @@ export async function loadPollState(db: D1Database): Promise<PollStateRow> {
   return row;
 }
 
+function errorWrites(db: D1Database, nowSec: number, kind: string, status: number | null, problemType: string | null): D1PreparedStatement[] {
+  return [
+    db.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (?, ?, ?, ?)").bind(nowSec, kind, status, problemType),
+    db.prepare("DELETE FROM poll_error WHERE at < ?").bind(nowSec - ERROR_RETENTION_SECONDS),
+  ];
+}
+
+// failureWrites and successWrite cover every API response, including the one from /setup/home.
+export function failureWrites(db: D1Database, state: PollStateRow, result: FetchFailure, nowSec: number): D1PreparedStatement[] {
+  const { keyExpiresAt, rateRemaining, rateResetSeconds, retryAfterSeconds } = result.meta;
+  const authFailures = state.auth_failures + (result.kind === "auth" ? 1 : 0);
+  const rateFailures = state.rate_limit_failures + (result.kind === "rate_limit" ? 1 : 0);
+  const notBefore = nextNotBefore(nowSec, { failureKind: result.kind, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures });
+  return [
+    ...errorWrites(db, nowSec, result.kind, result.status, result.problemType),
+    db
+      .prepare(
+        `UPDATE poll_state SET not_before = ?, auth_failures = ?, rate_limit_failures = ?,
+         key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining) WHERE id = 1`,
+      )
+      .bind(notBefore, authFailures, rateFailures, keyExpiresAt, rateRemaining),
+  ];
+}
+
+export function successWrite(db: D1Database, meta: RateMeta, nowSec: number): D1PreparedStatement {
+  const { keyExpiresAt, rateRemaining, rateResetSeconds, retryAfterSeconds } = meta;
+  const notBefore = nextNotBefore(nowSec, { failureKind: null, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures: 0 });
+  return db
+    .prepare(
+      `UPDATE poll_state SET not_before = ?, auth_failures = 0, rate_limit_failures = 0,
+       key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining) WHERE id = 1`,
+    )
+    .bind(notBefore, keyExpiresAt, rateRemaining);
+}
+
 export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
   const db = env.DB;
   const state = await loadPollState(db);
@@ -42,21 +77,12 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
   if (!due) return "skipped";
 
   const result = await fetchVehicle(env, POLL_PARTS, nowSec);
-  const { keyExpiresAt, rateRemaining, rateResetSeconds, retryAfterSeconds } = result.meta;
 
   if (!result.ok) {
-    const authFailures = state.auth_failures + (result.kind === "auth" ? 1 : 0);
-    const rateFailures = state.rate_limit_failures + (result.kind === "rate_limit" ? 1 : 0);
-    const notBefore = nextNotBefore(nowSec, { failureKind: result.kind, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures });
     await db.batch([
-      db.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (?, ?, ?, ?)").bind(nowSec, result.kind, result.status, result.problemType),
-      db.prepare("DELETE FROM poll_error WHERE at < ?").bind(nowSec - ERROR_RETENTION_SECONDS),
-      db
-        .prepare(
-          `UPDATE poll_state SET last_poll_at = ?, not_before = ?, auth_failures = ?, rate_limit_failures = ?,
-           key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining) WHERE id = 1`,
-        )
-        .bind(nowSec, notBefore, authFailures, rateFailures, keyExpiresAt, rateRemaining),
+      ...failureWrites(db, state, result, nowSec),
+      db.prepare("UPDATE poll_state SET last_poll_at = ? WHERE id = 1").bind(nowSec),
+      ...(await sessionWrites(db, null, nowSec, settings, env.TIMEZONE)),
     ]);
     return "error";
   }
@@ -64,12 +90,15 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
   const sample = toSample(result.body, settings, { plugState: state.last_plug_state, atHome: state.last_at_home });
   const isNew = sample !== null && (state.last_captured_at === null || sample.capturedAt > state.last_captured_at);
   const atHome = sample?.atHome == null ? null : Number(sample.atHome);
-  const notBefore = nextNotBefore(nowSec, { failureKind: null, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures: 0 });
+  // HOME-3 only carries a value across readings that stayed plugged in, so a car seen unplugged or
+  // newly plugged in with no position forgets it. A reading with no plug state says nothing either way.
+  const lastAtHome = atHome ?? (sample?.plugState == null ? state.last_at_home : null);
   const writes: D1PreparedStatement[] = [];
 
   if (sample === null) {
-    const kinds = (result.body.errors ?? []).map((e) => e.type).join(",") || "missing-charging";
-    writes.push(db.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (?, 'partial', 200, ?)").bind(nowSec, kinds.slice(0, 200)));
+    const errors = Array.isArray(result.body.errors) ? result.body.errors : [];
+    const kinds = errors.map((e) => e?.type).join(",") || "missing-charging";
+    writes.push(...errorWrites(db, nowSec, "partial", 200, kinds.slice(0, 200)));
   }
   if (sample !== null && isNew) {
     writes.push(
@@ -79,13 +108,13 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
     );
   }
   writes.push(
+    successWrite(db, result.meta, nowSec),
     db
       .prepare(
-        `UPDATE poll_state SET last_poll_at = ?, last_success_at = ?, not_before = ?, auth_failures = 0, rate_limit_failures = 0,
-         key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining),
-         last_captured_at = COALESCE(?, last_captured_at), last_plug_state = COALESCE(?, last_plug_state), last_at_home = COALESCE(?, last_at_home) WHERE id = 1`,
+        `UPDATE poll_state SET last_poll_at = ?, last_success_at = ?, last_captured_at = COALESCE(?, last_captured_at),
+         last_plug_state = COALESCE(?, last_plug_state), last_at_home = ? WHERE id = 1`,
       )
-      .bind(nowSec, nowSec, notBefore, keyExpiresAt, rateRemaining, isNew ? sample.capturedAt : null, sample?.plugState ?? null, atHome),
+      .bind(nowSec, nowSec, isNew ? sample.capturedAt : null, sample?.plugState ?? null, lastAtHome),
     ...(await sessionWrites(db, isNew ? sample : null, nowSec, settings, env.TIMEZONE)),
   );
   await db.batch(writes);

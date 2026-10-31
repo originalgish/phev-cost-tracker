@@ -23,9 +23,19 @@ const toSample = (r: SnapshotRow): Sample => ({
   atHome: r.at_home === null ? null : r.at_home === 1,
 });
 
+// A range that cuts through a stored session would split it or count it twice, so it grows to whole sessions.
+async function wholeSessions(db: D1Database, from: number, to: number): Promise<[number, number]> {
+  const crossing = (at: number) => db.prepare("SELECT started_at, ended_at FROM charge_session WHERE started_at < ? AND ended_at >= ?").bind(at, at);
+  const [atStart, atEnd] = await db.batch<{ started_at: number; ended_at: number }>([crossing(from), crossing(to)]);
+  const first = atStart?.results[0];
+  const last = atEnd?.results[0];
+  return [first?.started_at ?? from, last === undefined ? to : last.ended_at + 1];
+}
+
 // Replays snapshots in [from, to) through the same state machine as the live poll.
 // The caller must make sure no session is open.
-export async function rebuildSessions(db: D1Database, from: number, to: number, s: Settings, timeZone: string): Promise<number> {
+export async function rebuildSessions(db: D1Database, rangeFrom: number, rangeTo: number, s: Settings, timeZone: string): Promise<number> {
+  const [from, to] = await wholeSessions(db, rangeFrom, rangeTo);
   const { results } = await db
     .prepare("SELECT * FROM snapshot WHERE captured_at >= ? AND captured_at < ? ORDER BY captured_at")
     .bind(from, to)

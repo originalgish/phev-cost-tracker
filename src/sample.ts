@@ -27,7 +27,7 @@ export function resolveAtHome(parking: ParkingPosition | undefined, s: Settings,
 }
 
 export function toSample(body: VehicleResponse, s: Settings, prev: PreviousPlace): Sample | null {
-  const charging = body.vehicle.charging;
+  const charging = body.vehicle?.charging;
   const capturedMs = Date.parse(charging?.carCapturedTimestamp ?? "");
   if (Number.isNaN(capturedMs)) return null;
   const status = charging?.status;
@@ -38,7 +38,7 @@ export function toSample(body: VehicleResponse, s: Settings, prev: PreviousPlace
     chargeState: status?.state ?? null,
     powerKw: status?.chargePowerInKw ?? null,
     socPercent: status?.battery?.stateOfChargeInPercent ?? null,
-    odometerKm: body.vehicle.odometer?.mileageInKm ?? null,
-    atHome: resolveAtHome(body.vehicle.parkingPosition, s, plugState, prev),
+    odometerKm: body.vehicle?.odometer?.mileageInKm ?? null,
+    atHome: resolveAtHome(body.vehicle?.parkingPosition, s, plugState, prev),
   };
 }

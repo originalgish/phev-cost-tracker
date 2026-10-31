@@ -25,7 +25,7 @@ Requirements: Node 22 or newer, pnpm 12. Run every command from the project root
 
 ```text
 phev-cost-tracker/
-├── PLAN.md, IMPLEMENTATION_PLAN.md, CLAUDE.md, probe.py
+├── README.md, PLAN.md, IMPLEMENTATION_PLAN.md, CLAUDE.md, probe.py
 ├── specs/                  source of truth for behaviour
 ├── package.json, pnpm-workspace.yaml, tsconfig.json
 ├── vitest.config.ts, wrangler.jsonc
@@ -37,7 +37,7 @@ phev-cost-tracker/
 │   ├── index.ts            Worker entry: fetch and scheduled
 │   ├── routes.ts           health, settings, setup
 │   ├── session-routes.ts   months, sessions, maintenance
-│   ├── auth.ts             Access JWT check
+│   ├── auth.ts             Access JWT and cross-site checks
 │   ├── poll.ts             one poll, end to end
 │   ├── gate.ts             when to poll, when to back off (pure)
 │   ├── skoda.ts            API client
@@ -527,11 +527,13 @@ export function shouldPoll(nowSec: number, g: GateInput): boolean {
 }
 
 export function nextNotBefore(nowSec: number, b: BackoffInput): number | null {
-  if (b.failureKind === "rate_limit") return nowSec + (b.retryAfterSeconds ?? DEFAULT_RATE_LIMIT_BACKOFF_SECONDS);
-  if (b.failureKind !== null && b.retryAfterSeconds !== null) return nowSec + b.retryAfterSeconds;
-  if (b.failureKind === "auth" && b.authFailures >= AUTH_FAILURE_LIMIT) return nowSec + AUTH_BACKOFF_SECONDS;
-  if (b.rateRemaining !== null && b.rateRemaining <= 1 && b.rateResetSeconds !== null) return nowSec + b.rateResetSeconds;
-  return null;
+  // Several reasons can apply at once, so the longest pause wins.
+  const waits: number[] = [];
+  if (b.failureKind === "rate_limit") waits.push(b.retryAfterSeconds ?? DEFAULT_RATE_LIMIT_BACKOFF_SECONDS);
+  else if (b.failureKind !== null && b.retryAfterSeconds !== null) waits.push(b.retryAfterSeconds);
+  if (b.failureKind === "auth" && b.authFailures >= AUTH_FAILURE_LIMIT) waits.push(AUTH_BACKOFF_SECONDS);
+  if (b.rateRemaining !== null && b.rateRemaining <= 1 && b.rateResetSeconds !== null) waits.push(b.rateResetSeconds);
+  return waits.length === 0 ? null : nowSec + Math.max(...waits);
 }
 ```
 
@@ -620,6 +622,15 @@ describe("nextNotBefore", () => {
     expect(nextNotBefore(100, { ...ok, failureKind: "auth", authFailures: 3 })).toBe(3700);
   });
   it("POLL-7 pauses when the quota is nearly gone", () => expect(nextNotBefore(100, { ...ok, rateRemaining: 1 })).toBe(200));
+  it("POLL-7 keeps the quota pause when Retry-After is shorter", () => {
+    expect(nextNotBefore(100, { ...ok, failureKind: "server", retryAfterSeconds: 30, rateRemaining: 0, rateResetSeconds: 1800 })).toBe(1900);
+  });
+  it("POLL-7 keeps the auth pause when Retry-After is shorter", () => {
+    expect(nextNotBefore(100, { ...ok, failureKind: "auth", retryAfterSeconds: 30, authFailures: 3 })).toBe(3700);
+  });
+  it("POLL-6 POLL-7 keeps Retry-After when it is the longest pause", () => {
+    expect(nextNotBefore(100, { ...ok, failureKind: "rate_limit", retryAfterSeconds: 7200, rateRemaining: 0, rateResetSeconds: 60 })).toBe(7300);
+  });
 });
 ```
 
@@ -710,7 +721,7 @@ export type ParkingPosition = {
 };
 
 export type VehicleResponse = {
-  vehicle: {
+  vehicle?: {
     parkingPosition?: ParkingPosition;
     odometer?: { mileageInKm: number };
     charging?: {
@@ -738,6 +749,8 @@ export type ErrorKind = "auth" | "rate_limit" | "server" | "network";
 export type FetchResult =
   | { ok: true; body: VehicleResponse; meta: RateMeta }
   | { ok: false; kind: ErrorKind; status: number | null; problemType: string | null; meta: RateMeta };
+
+export type FetchFailure = Extract<FetchResult, { ok: false }>;
 
 const EMPTY_META: RateMeta = { keyExpiresAt: null, rateRemaining: null, rateResetSeconds: null, retryAfterSeconds: null };
 
@@ -796,7 +809,7 @@ export async function fetchVehicle(env: Env, parts: string[], nowSec: number): P
     return { ok: false, kind: classify(res.status), status: res.status, problemType: await problemSlug(res), meta };
   }
   try {
-    return { ok: true, body: await res.json<VehicleResponse>(), meta };
+    return { ok: true, body: (await res.json<VehicleResponse | null>()) ?? {}, meta };
   } catch {
     return { ok: false, kind: "server", status: res.status, problemType: "invalid-json", meta };
   }
@@ -902,7 +915,7 @@ export function resolveAtHome(parking: ParkingPosition | undefined, s: Settings,
 }
 
 export function toSample(body: VehicleResponse, s: Settings, prev: PreviousPlace): Sample | null {
-  const charging = body.vehicle.charging;
+  const charging = body.vehicle?.charging;
   const capturedMs = Date.parse(charging?.carCapturedTimestamp ?? "");
   if (Number.isNaN(capturedMs)) return null;
   const status = charging?.status;
@@ -913,8 +926,8 @@ export function toSample(body: VehicleResponse, s: Settings, prev: PreviousPlace
     chargeState: status?.state ?? null,
     powerKw: status?.chargePowerInKw ?? null,
     socPercent: status?.battery?.stateOfChargeInPercent ?? null,
-    odometerKm: body.vehicle.odometer?.mileageInKm ?? null,
-    atHome: resolveAtHome(body.vehicle.parkingPosition, s, plugState, prev),
+    odometerKm: body.vehicle?.odometer?.mileageInKm ?? null,
+    atHome: resolveAtHome(body.vehicle?.parkingPosition, s, plugState, prev),
   };
 }
 ```
@@ -938,7 +951,7 @@ import { nextNotBefore, shouldPoll } from "./gate";
 import { toSample } from "./sample";
 import { sessionWrites } from "./session-store";
 import { loadSettings } from "./settings";
-import { fetchVehicle } from "./skoda";
+import { fetchVehicle, type FetchFailure, type RateMeta } from "./skoda";
 
 const POLL_PARTS = ["charging", "parkingPosition", "odometer"];
 const ERROR_RETENTION_SECONDS = 30 * 86400;
@@ -964,6 +977,41 @@ export async function loadPollState(db: D1Database): Promise<PollStateRow> {
   return row;
 }
 
+function errorWrites(db: D1Database, nowSec: number, kind: string, status: number | null, problemType: string | null): D1PreparedStatement[] {
+  return [
+    db.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (?, ?, ?, ?)").bind(nowSec, kind, status, problemType),
+    db.prepare("DELETE FROM poll_error WHERE at < ?").bind(nowSec - ERROR_RETENTION_SECONDS),
+  ];
+}
+
+// failureWrites and successWrite cover every API response, including the one from /setup/home.
+export function failureWrites(db: D1Database, state: PollStateRow, result: FetchFailure, nowSec: number): D1PreparedStatement[] {
+  const { keyExpiresAt, rateRemaining, rateResetSeconds, retryAfterSeconds } = result.meta;
+  const authFailures = state.auth_failures + (result.kind === "auth" ? 1 : 0);
+  const rateFailures = state.rate_limit_failures + (result.kind === "rate_limit" ? 1 : 0);
+  const notBefore = nextNotBefore(nowSec, { failureKind: result.kind, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures });
+  return [
+    ...errorWrites(db, nowSec, result.kind, result.status, result.problemType),
+    db
+      .prepare(
+        `UPDATE poll_state SET not_before = ?, auth_failures = ?, rate_limit_failures = ?,
+         key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining) WHERE id = 1`,
+      )
+      .bind(notBefore, authFailures, rateFailures, keyExpiresAt, rateRemaining),
+  ];
+}
+
+export function successWrite(db: D1Database, meta: RateMeta, nowSec: number): D1PreparedStatement {
+  const { keyExpiresAt, rateRemaining, rateResetSeconds, retryAfterSeconds } = meta;
+  const notBefore = nextNotBefore(nowSec, { failureKind: null, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures: 0 });
+  return db
+    .prepare(
+      `UPDATE poll_state SET not_before = ?, auth_failures = 0, rate_limit_failures = 0,
+       key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining) WHERE id = 1`,
+    )
+    .bind(notBefore, keyExpiresAt, rateRemaining);
+}
+
 export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
   const db = env.DB;
   const state = await loadPollState(db);
@@ -978,21 +1026,12 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
   if (!due) return "skipped";
 
   const result = await fetchVehicle(env, POLL_PARTS, nowSec);
-  const { keyExpiresAt, rateRemaining, rateResetSeconds, retryAfterSeconds } = result.meta;
 
   if (!result.ok) {
-    const authFailures = state.auth_failures + (result.kind === "auth" ? 1 : 0);
-    const rateFailures = state.rate_limit_failures + (result.kind === "rate_limit" ? 1 : 0);
-    const notBefore = nextNotBefore(nowSec, { failureKind: result.kind, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures });
     await db.batch([
-      db.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (?, ?, ?, ?)").bind(nowSec, result.kind, result.status, result.problemType),
-      db.prepare("DELETE FROM poll_error WHERE at < ?").bind(nowSec - ERROR_RETENTION_SECONDS),
-      db
-        .prepare(
-          `UPDATE poll_state SET last_poll_at = ?, not_before = ?, auth_failures = ?, rate_limit_failures = ?,
-           key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining) WHERE id = 1`,
-        )
-        .bind(nowSec, notBefore, authFailures, rateFailures, keyExpiresAt, rateRemaining),
+      ...failureWrites(db, state, result, nowSec),
+      db.prepare("UPDATE poll_state SET last_poll_at = ? WHERE id = 1").bind(nowSec),
+      ...(await sessionWrites(db, null, nowSec, settings, env.TIMEZONE)),
     ]);
     return "error";
   }
@@ -1000,12 +1039,15 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
   const sample = toSample(result.body, settings, { plugState: state.last_plug_state, atHome: state.last_at_home });
   const isNew = sample !== null && (state.last_captured_at === null || sample.capturedAt > state.last_captured_at);
   const atHome = sample?.atHome == null ? null : Number(sample.atHome);
-  const notBefore = nextNotBefore(nowSec, { failureKind: null, retryAfterSeconds, rateRemaining, rateResetSeconds, authFailures: 0 });
+  // HOME-3 only carries a value across readings that stayed plugged in, so a car seen unplugged or
+  // newly plugged in with no position forgets it. A reading with no plug state says nothing either way.
+  const lastAtHome = atHome ?? (sample?.plugState == null ? state.last_at_home : null);
   const writes: D1PreparedStatement[] = [];
 
   if (sample === null) {
-    const kinds = (result.body.errors ?? []).map((e) => e.type).join(",") || "missing-charging";
-    writes.push(db.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (?, 'partial', 200, ?)").bind(nowSec, kinds.slice(0, 200)));
+    const errors = Array.isArray(result.body.errors) ? result.body.errors : [];
+    const kinds = errors.map((e) => e?.type).join(",") || "missing-charging";
+    writes.push(...errorWrites(db, nowSec, "partial", 200, kinds.slice(0, 200)));
   }
   if (sample !== null && isNew) {
     writes.push(
@@ -1015,13 +1057,13 @@ export async function pollOnce(env: Env, nowSec: number): Promise<PollOutcome> {
     );
   }
   writes.push(
+    successWrite(db, result.meta, nowSec),
     db
       .prepare(
-        `UPDATE poll_state SET last_poll_at = ?, last_success_at = ?, not_before = ?, auth_failures = 0, rate_limit_failures = 0,
-         key_expires_at = COALESCE(?, key_expires_at), rate_limit_remaining = COALESCE(?, rate_limit_remaining),
-         last_captured_at = COALESCE(?, last_captured_at), last_plug_state = COALESCE(?, last_plug_state), last_at_home = COALESCE(?, last_at_home) WHERE id = 1`,
+        `UPDATE poll_state SET last_poll_at = ?, last_success_at = ?, last_captured_at = COALESCE(?, last_captured_at),
+         last_plug_state = COALESCE(?, last_plug_state), last_at_home = ? WHERE id = 1`,
       )
-      .bind(nowSec, nowSec, notBefore, keyExpiresAt, rateRemaining, isNew ? sample.capturedAt : null, sample?.plugState ?? null, atHome),
+      .bind(nowSec, nowSec, isNew ? sample.capturedAt : null, sample?.plugState ?? null, lastAtHome),
     ...(await sessionWrites(db, isNew ? sample : null, nowSec, settings, env.TIMEZONE)),
   );
   await db.batch(writes);
@@ -1167,9 +1209,11 @@ describe("pollOnce", () => {
   });
   it("POLL-2 does not call the API when the gate is closed", async () => {
     await env.DB.prepare("UPDATE poll_state SET last_poll_at = ?").bind(T0).run();
+    const before = await env.DB.prepare("SELECT * FROM poll_state").first();
     const f = vi.spyOn(globalThis, "fetch");
     expect(await pollOnce(env, T0 + 300)).toBe("skipped");
     expect(f).not.toHaveBeenCalled();
+    expect(await env.DB.prepare("SELECT * FROM poll_state").first()).toEqual(before);
   });
   it("POLL-6 POLL-8 honours Retry-After and logs a 429", async () => {
     const body = { type: "https://public.api.connect.skoda-auto.cz/problems/rate-limit-exceeded" };
@@ -1198,6 +1242,17 @@ describe("pollOnce", () => {
     expect(await env.DB.prepare("SELECT kind, problem_type FROM poll_error").first()).toEqual({ kind: "partial", problem_type: "CHARGING_UNAVAILABLE" });
     expect(await count("snapshot")).toBe(0);
   });
+  it("POLL-5 POLL-8 survives a 200 with no vehicle", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ errors: [{ type: "VEHICLE_UNAVAILABLE" }] }));
+    expect(await pollOnce(env, T0)).toBe("partial");
+    expect(await env.DB.prepare("SELECT problem_type FROM poll_error").first()).toEqual({ problem_type: "VEHICLE_UNAVAILABLE" });
+    expect(await env.DB.prepare("SELECT last_poll_at FROM poll_state").first()).toEqual({ last_poll_at: T0 });
+  });
+  it("POLL-5 POLL-8 survives a null body", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse(null));
+    expect(await pollOnce(env, T0)).toBe("partial");
+    expect(await env.DB.prepare("SELECT problem_type FROM poll_error").first()).toEqual({ problem_type: "missing-charging" });
+  });
   it("HOME-1 HOME-2 stores at_home 0 away and NULL before home is set", async () => {
     mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" })]);
     await pollOnce(env, T0);
@@ -1218,9 +1273,34 @@ describe("pollOnce", () => {
     await pollOnce(env, T0 + 600);
     expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 1 });
   });
+  it("HOME-3 keeps at_home through a reading with no plug state", async () => {
+    await setHomeAndPrices();
+    const noPlug = vehicleBody({ ts: "2026-10-31T22:10Z", parking: { state: "IN_MOTION" } });
+    Object.assign(noPlug.vehicle.charging.status, { plugConnectionState: undefined });
+    mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z" }), noPlug, vehicleBody({ ts: "2026-10-31T22:20Z", parking: { state: "IN_MOTION" } })]);
+    for (let i = 0; i < 3; i++) await pollOnce(env, T0 + i * 600);
+    expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: 1 });
+  });
+  it("HOME-2 HOME-3 does not carry at_home across a drive", async () => {
+    await setHomeAndPrices();
+    mockApiSequence([
+      vehicleBody({ ts: "2026-10-31T22:00Z", plug: "DISCONNECTED" }),
+      vehicleBody({ ts: "2026-10-31T22:15Z", plug: "DISCONNECTED", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:30Z", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:45Z", parking: { state: "IN_MOTION" } }),
+    ]);
+    for (let i = 0; i < 4; i++) await pollOnce(env, T0 + i * 900);
+    expect(await env.DB.prepare("SELECT at_home FROM snapshot ORDER BY captured_at DESC").first()).toEqual({ at_home: null });
+  });
   it("POLL-11 deletes logged errors after 30 days", async () => {
     await env.DB.prepare("INSERT INTO poll_error (at, kind) VALUES (?, 'server')").bind(T0 - 31 * 86400).run();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
+    await pollOnce(env, T0);
+    expect(await env.DB.prepare("SELECT at FROM poll_error").all().then((r) => r.results)).toEqual([{ at: T0 }]);
+  });
+  it("POLL-11 also deletes them when logging a partial response", async () => {
+    await env.DB.prepare("INSERT INTO poll_error (at, kind) VALUES (?, 'server')").bind(T0 - 31 * 86400).run();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(apiResponse({ vehicle: {}, errors: [{ type: "CHARGING_UNAVAILABLE" }] }));
     await pollOnce(env, T0);
     expect(await env.DB.prepare("SELECT at FROM poll_error").all().then((r) => r.results)).toEqual([{ at: T0 }]);
   });
@@ -1239,7 +1319,7 @@ describe("pollOnce", () => {
 What one poll does:
 
 1. Read `poll_state` and settings. If the gate is closed, stop. No API call is made.
-2. Call the API. On failure, log to `poll_error`, count the failure, set `not_before` if needed, and stop.
+2. Call the API. On failure, log to `poll_error`, count the failure, set `not_before` if needed, close a stale session, and stop.
 3. Turn the response into a `Sample`. If `charging` is missing, log a `partial` error.
 4. If the car's timestamp is newer than the last one, insert a snapshot.
 5. Update `poll_state`, and apply any session change, in one `db.batch`.
@@ -1258,8 +1338,21 @@ What one poll does:
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { MiddlewareHandler } from "hono";
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const FORM_TYPE = /^\s*(application\/x-www-form-urlencoded|multipart\/form-data|text\/plain)\b/i;
+
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 let jwksFor: string | null = null;
+
+// hono/csrf is not enough here: it lets JSON from other origins and same-origin forms through.
+export const rejectCrossSite: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
+  if (SAFE_METHODS.has(c.req.method)) return next();
+  const type = c.req.header("Content-Type") ?? "";
+  const origin = c.req.header("Origin");
+  const otherOrigin = origin !== undefined && origin !== new URL(c.req.url).origin;
+  if (type === "" || FORM_TYPE.test(type) || otherOrigin) return c.json({ error: "forbidden" }, 403);
+  await next();
+};
 
 export const requireAccess: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
   const { ACCESS_TEAM_DOMAIN: team, ACCESS_AUD: aud } = c.env;
@@ -1283,9 +1376,8 @@ export const requireAccess: MiddlewareHandler<{ Bindings: Env }> = async (c, nex
 
 ```ts
 import { Hono } from "hono";
-import { csrf } from "hono/csrf";
-import { requireAccess } from "./auth";
-import { loadPollState } from "./poll";
+import { rejectCrossSite, requireAccess } from "./auth";
+import { failureWrites, loadPollState, successWrite } from "./poll";
 import { loadSettings } from "./settings";
 import { fetchVehicle } from "./skoda";
 
@@ -1314,8 +1406,8 @@ const EDITABLE: Record<string, (v: unknown) => string | null> = {
 
 export const app = new Hono<AppEnv>();
 
-app.use("/api/*", csrf(), requireAccess);
-app.use("/setup/*", csrf(), requireAccess);
+app.use("/api/*", rejectCrossSite, requireAccess);
+app.use("/setup/*", rejectCrossSite, requireAccess);
 
 app.get("/api/health", async (c) => {
   const st = await loadPollState(c.env.DB);
@@ -1343,10 +1435,11 @@ app.get("/api/settings", async (c) => {
 
 app.put("/api/settings", async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  if (body === null || typeof body !== "object") return c.json({ error: "JSON object required" }, 400);
+  if (body === null || typeof body !== "object" || Array.isArray(body)) return c.json({ error: "JSON object required" }, 400);
   const writes: D1PreparedStatement[] = [];
   for (const [key, value] of Object.entries(body)) {
-    const encoded = EDITABLE[key]?.(value) ?? null;
+    // hasOwn, because a key like `toString` would otherwise find Object.prototype.
+    const encoded = Object.hasOwn(EDITABLE, key) ? (EDITABLE[key]?.(value) ?? null) : null;
     if (encoded === null) return c.json({ error: `invalid value for ${key}` }, 400);
     writes.push(c.env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").bind(key, encoded));
   }
@@ -1355,16 +1448,28 @@ app.put("/api/settings", async (c) => {
 });
 
 app.post("/setup/home", async (c) => {
-  const settings = await loadSettings(c.env.DB);
+  const db = c.env.DB;
+  const settings = await loadSettings(db);
   if (settings.homeLat !== null && c.req.query("force") !== "1") return c.json({ error: "home already set; pass force=1 to replace it" }, 409);
-  const result = await fetchVehicle(c.env, ["parkingPosition"], Math.floor(Date.now() / 1000));
-  if (!result.ok) return c.json({ error: `Škoda API error: ${result.kind}` }, 502);
-  const parking = result.body.vehicle.parkingPosition;
-  if (parking?.state !== "PARKED" || parking.gpsCoordinates === undefined) return c.json({ error: "car is not reporting a parked position" }, 409);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const state = await loadPollState(db);
+  if (state.not_before !== null && nowSec < state.not_before) return c.json({ error: "Škoda API calls are paused; try again later" }, 409);
+  const result = await fetchVehicle(c.env, ["parkingPosition"], nowSec);
+  if (!result.ok) {
+    await db.batch(failureWrites(db, state, result, nowSec));
+    return c.json({ error: `Škoda API error: ${result.kind}` }, 502);
+  }
+  const answered = successWrite(db, result.meta, nowSec);
+  const parking = result.body.vehicle?.parkingPosition;
+  if (parking?.state !== "PARKED" || parking.gpsCoordinates === undefined) {
+    await answered.run();
+    return c.json({ error: "car is not reporting a parked position" }, 409);
+  }
   const { latitude, longitude } = parking.gpsCoordinates;
-  await c.env.DB.batch([
-    c.env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lat', ?)").bind(String(latitude)),
-    c.env.DB.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lon', ?)").bind(String(longitude)),
+  await db.batch([
+    answered,
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lat', ?)").bind(String(latitude)),
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('home_lon', ?)").bind(String(longitude)),
   ]);
   return c.json({ home_set: true });
 });
@@ -1452,7 +1557,34 @@ describe("SEC-3 dev bypass", () => {
   it("does not work on 127.0.0.1", async () => expect((await app.request("http://127.0.0.1:8787/api/health", {}, bypass)).status).toBe(403));
 });
 
+describe("SEC-2 cross-site requests", () => {
+  const body = { vat_percent: 1 };
+
+  it("rejects JSON from another origin", async () => {
+    mockFetch(() => new Response("{}"));
+    const res = await send("PUT", "/api/settings", { ...(await authedHeaders()), Origin: "https://evil.example" }, body);
+    expect(res.status).toBe(403);
+    expect((await loadSettings(env.DB)).prices).toBeNull();
+    expect(await env.DB.prepare("SELECT value FROM settings WHERE key = 'vat_percent'").first()).toBeNull();
+  });
+  it.each(["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x"])("rejects %s from the same origin", async (type) => {
+    mockFetch(() => new Response("{}"));
+    const res = await send("PUT", "/api/settings", { ...(await authedHeaders()), "content-type": type, Origin: "https://x" }, body);
+    expect(res.status).toBe(403);
+  });
+  it("accepts JSON from the same origin", async () => {
+    mockFetch(() => new Response("{}"));
+    expect((await send("PUT", "/api/settings", { ...(await authedHeaders()), Origin: "https://x" }, body)).status).toBe(200);
+  });
+});
+
 describe("API-1 health", () => {
+  it("returns the 10 most recent errors, newest first", async () => {
+    await env.DB.batch(Array.from({ length: 11 }, (_, i) => env.DB.prepare("INSERT INTO poll_error (at, kind) VALUES (?, 'server')").bind(i + 1)));
+    mockFetch(() => new Response("{}"));
+    const body = await (await get("/api/health", await authedHeaders())).json<{ errors: { at: number }[] }>();
+    expect(body.errors.map((e) => e.at)).toEqual([11, 10, 9, 8, 7, 6, 5, 4, 3, 2]);
+  });
   it("returns the health fields", async () => {
     mockFetch(() => new Response("{}"));
     await env.DB.prepare("INSERT INTO poll_error (at, kind, http_status, problem_type) VALUES (5, 'auth', 401, 'api-key-expired')").run();
@@ -1482,10 +1614,23 @@ describe("API-2 API-3 settings", () => {
     expect(got.prices_complete).toBe(false);
     expect(JSON.stringify(got)).not.toContain("home_lat");
   });
+  it("rejects a key inherited from Object.prototype", async () => {
+    mockFetch(() => new Response("{}"));
+    const h = await authedHeaders();
+    for (const key of ["toString", "constructor", "hasOwnProperty"]) {
+      expect((await send("PUT", "/api/settings", h, { [key]: 1 })).status).toBe(400);
+    }
+    expect(await env.DB.prepare("SELECT key FROM settings WHERE key IN ('toString', 'constructor', 'hasOwnProperty')").first()).toBeNull();
+  });
+  it("rejects a body that is not an object", async () => {
+    mockFetch(() => new Response("{}"));
+    expect((await send("PUT", "/api/settings", await authedHeaders(), [])).status).toBe(400);
+  });
 });
 
 describe("HOME-4 POST /setup/home", () => {
   const parked = () => apiResponse({ vehicle: { parkingPosition: { state: "PARKED", gpsCoordinates: HOME } } });
+  const apiCalls = (f: ReturnType<typeof mockFetch>) => f.mock.calls.filter(([url]) => String(url).includes("skoda-auto")).length;
 
   it("SEC-5 stores the position once and never returns it", async () => {
     mockFetch(parked);
@@ -1501,6 +1646,42 @@ describe("HOME-4 POST /setup/home", () => {
     mockFetch(() => apiResponse({ vehicle: { parkingPosition: { state: "IN_MOTION" } } }));
     expect((await send("POST", "/setup/home", await authedHeaders())).status).toBe(409);
   });
+  it("survives a 200 with no vehicle", async () => {
+    mockFetch(() => apiResponse({ errors: [{ type: "VEHICLE_UNAVAILABLE" }] }));
+    expect((await send("POST", "/setup/home", await authedHeaders())).status).toBe(409);
+  });
+  it("spends one API request", async () => {
+    const f = mockFetch(parked);
+    await send("POST", "/setup/home", await authedHeaders());
+    expect(apiCalls(f)).toBe(1);
+  });
+  it("makes no API call while polling is paused", async () => {
+    await env.DB.prepare("UPDATE poll_state SET not_before = ?").bind(Math.floor(Date.now() / 1000) + 3600).run();
+    const f = mockFetch(parked);
+    expect((await send("POST", "/setup/home", await authedHeaders())).status).toBe(409);
+    expect(apiCalls(f)).toBe(0);
+  });
+  it("POLL-9 POLL-10 handles a good response like a poll", async () => {
+    await env.DB.prepare("UPDATE poll_state SET auth_failures = 2, rate_limit_failures = 2").run();
+    mockFetch(parked);
+    await send("POST", "/setup/home", await authedHeaders());
+    const state = await env.DB.prepare("SELECT rate_limit_remaining, auth_failures, rate_limit_failures, last_poll_at FROM poll_state").first();
+    expect(state).toEqual({ rate_limit_remaining: 15, auth_failures: 0, rate_limit_failures: 0, last_poll_at: null });
+  });
+  it("POLL-10 records a response that has no parked position", async () => {
+    mockFetch(() => apiResponse({ vehicle: { parkingPosition: { state: "IN_MOTION" } } }));
+    await send("POST", "/setup/home", await authedHeaders());
+    expect(await env.DB.prepare("SELECT rate_limit_remaining FROM poll_state").first()).toEqual({ rate_limit_remaining: 15 });
+  });
+  it("POLL-6 POLL-8 handles a 429 like a poll", async () => {
+    mockFetch(() => new Response("{}", { status: 429, headers: { "Retry-After": "600" } }));
+    const before = Math.floor(Date.now() / 1000);
+    expect((await send("POST", "/setup/home", await authedHeaders())).status).toBe(502);
+    expect(await env.DB.prepare("SELECT kind, http_status FROM poll_error").first()).toEqual({ kind: "rate_limit", http_status: 429 });
+    const state = await env.DB.prepare("SELECT not_before, rate_limit_failures FROM poll_state").first<{ not_before: number; rate_limit_failures: number }>();
+    expect(state?.not_before).toBeGreaterThanOrEqual(before + 600);
+    expect(state?.rate_limit_failures).toBe(1);
+  });
   it("SEC-2 needs a JSON content type", async () => {
     mockFetch(parked);
     const { "content-type": _dropped, ...h } = await authedHeaders();
@@ -1514,7 +1695,7 @@ Notes:
 
 - `run_worker_first` in `wrangler.jsonc` sends `/api/*` and `/setup/*` through the Worker. Everything else is a static file, which holds no data.
 - `DEV_AUTH_BYPASS` only works when the host is exactly `localhost`, and it is never set on the deployed Worker.
-- Hono's `csrf()` treats a POST with no `Content-Type` as a form and returns 403. Always send `Content-Type: application/json`.
+- `rejectCrossSite` in `auth.ts` replaces Hono's `csrf()`, which lets JSON from other origins and same-origin forms through (SEC-2). A POST with no `Content-Type` gets 403, so always send `Content-Type: application/json`.
 
 Check it locally:
 
@@ -1575,7 +1756,7 @@ Expect JSON with `"last_poll_at":null`. Stop the dev server. Do not trigger the 
 7. In **Zero Trust**, open **Access** then **Applications** and find this app. Copy its Application Audience (AUD) tag. Also note your team domain, which looks like `https://<team>.cloudflareaccess.com`. Dashboard labels may differ slightly.
 8. Put both values into `vars` in `wrangler.jsonc`, then run `pnpm deploy` again. These values and the `database_id` are identifiers, not secrets, but they will be visible in the public repository.
 9. Open the Worker's URL in a private browser window. You must get the Access login page.
-10. After logging in, with the car parked at home, select **Capture home position**. Expect `{"home_set":true}`.
+10. After logging in, with the car parked at home, select **Capture home position**. Expect "Home position captured." on the page.
 
 **Done when:** the login page appears, `home_set` is true, and `/api/health` shows `last_success_at` set within 20 minutes.
 
@@ -1967,6 +2148,24 @@ describe("charge flow", () => {
     await pollOnce(env, T0 + 200 * 60);
     expect(await env.DB.prepare("SELECT status, end_reason FROM charge_session").first()).toEqual({ status: "closed", end_reason: "stale" });
   });
+  it("SES-5 closes a silent session during an API outage", async () => {
+    mockApiSequence([vehicleBody({ ts: "2026-10-31T22:00Z", state: "CHARGING", kw: 3.6 })]);
+    await pollOnce(env, T0);
+    vi.restoreAllMocks();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 500 }));
+    await pollOnce(env, T0 + 200 * 60);
+    expect(await env.DB.prepare("SELECT status, end_reason FROM charge_session").first()).toEqual({ status: "closed", end_reason: "stale" });
+  });
+  it("SES-1 HOME-3 ignores a charge after a drive when the car reports no position", async () => {
+    mockApiSequence([
+      vehicleBody({ ts: "2026-10-31T22:00Z", plug: "DISCONNECTED" }),
+      vehicleBody({ ts: "2026-10-31T22:15Z", plug: "DISCONNECTED", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:30Z", state: "READY_FOR_CHARGING", parking: { state: "IN_MOTION" } }),
+      vehicleBody({ ts: "2026-10-31T22:45Z", state: "CHARGING", kw: 11, parking: { state: "IN_MOTION" } }),
+    ]);
+    for (let i = 0; i < 4; i++) await pollOnce(env, T0 + i * 900);
+    expect(await env.DB.prepare("SELECT count(*) AS n FROM charge_session").first()).toEqual({ n: 0 });
+  });
 });
 ```
 
@@ -1979,7 +2178,7 @@ describe("charge flow", () => {
 
 **Implements:** SES-11, COST-4, API-4, API-5, API-6.
 
-- **Rebuild** deletes sessions in a time range and replays stored snapshots. It lets Phase 1 data become sessions. It cannot detect `stale` closes in the middle of a range, because snapshots carry no wall-clock time, so a long silence counts as a gap instead.
+- **Rebuild** deletes sessions in a time range and replays stored snapshots. A stored session that crosses either end of the range is rebuilt whole. It lets Phase 1 data become sessions. It cannot detect `stale` closes in the middle of a range, because snapshots carry no wall-clock time, so a long silence counts as a gap instead.
 - **Recompute** applies the current prices, battery size and energy source to all closed sessions. Run it after changing settings.
 
 **File: `src/maintenance.ts`**
@@ -2010,9 +2209,19 @@ const toSample = (r: SnapshotRow): Sample => ({
   atHome: r.at_home === null ? null : r.at_home === 1,
 });
 
+// A range that cuts through a stored session would split it or count it twice, so it grows to whole sessions.
+async function wholeSessions(db: D1Database, from: number, to: number): Promise<[number, number]> {
+  const crossing = (at: number) => db.prepare("SELECT started_at, ended_at FROM charge_session WHERE started_at < ? AND ended_at >= ?").bind(at, at);
+  const [atStart, atEnd] = await db.batch<{ started_at: number; ended_at: number }>([crossing(from), crossing(to)]);
+  const first = atStart?.results[0];
+  const last = atEnd?.results[0];
+  return [first?.started_at ?? from, last === undefined ? to : last.ended_at + 1];
+}
+
 // Replays snapshots in [from, to) through the same state machine as the live poll.
 // The caller must make sure no session is open.
-export async function rebuildSessions(db: D1Database, from: number, to: number, s: Settings, timeZone: string): Promise<number> {
+export async function rebuildSessions(db: D1Database, rangeFrom: number, rangeTo: number, s: Settings, timeZone: string): Promise<number> {
+  const [from, to] = await wholeSessions(db, rangeFrom, rangeTo);
   const { results } = await db
     .prepare("SELECT * FROM snapshot WHERE captured_at >= ? AND captured_at < ? ORDER BY captured_at")
     .bind(from, to)
@@ -2057,6 +2266,7 @@ import type { AppEnv } from "./routes";
 import { loadSettings } from "./settings";
 
 const MONTH = /^\d{4}-\d{2}$/;
+const SECONDS = /^\d+$/;
 
 export function registerSessionRoutes(app: Hono<AppEnv>): void {
   app.get("/api/months", async (c) => {
@@ -2080,9 +2290,11 @@ export function registerSessionRoutes(app: Hono<AppEnv>): void {
   });
 
   app.post("/api/sessions/rebuild", async (c) => {
-    const from = Number(c.req.query("from"));
-    const to = Number(c.req.query("to"));
-    if (!Number.isInteger(from) || !Number.isInteger(to) || to <= from) return c.json({ error: "from and to must be unix seconds" }, 400);
+    const rawFrom = c.req.query("from") ?? "";
+    const rawTo = c.req.query("to") ?? "";
+    const from = Number(rawFrom);
+    const to = Number(rawTo);
+    if (!SECONDS.test(rawFrom) || !SECONDS.test(rawTo) || to <= from) return c.json({ error: "from and to must be unix seconds" }, 400);
     const open = await c.env.DB.prepare("SELECT id FROM charge_session WHERE status = 'open'").first();
     if (open !== null) return c.json({ error: "a session is open; retry after it closes" }, 409);
     const sessions = await rebuildSessions(c.env.DB, from, to, await loadSettings(c.env.DB), c.env.TIMEZONE);
@@ -2144,6 +2356,20 @@ describe("maintenance", () => {
     expect(await rebuildSessions(env.DB, T0 - 3600, T0 + 7200, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
     expect(await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).first()).toEqual(live);
   });
+  it("SES-11 rebuilds a session whole when the range starts inside it", async () => {
+    await liveCharge();
+    const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all();
+    const inside = Date.parse("2026-10-31T22:10Z") / 1000;
+    expect(await rebuildSessions(env.DB, inside, T0 + 7200, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect((await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all()).results).toEqual(live.results);
+  });
+  it("SES-11 rebuilds a session whole when the range ends inside it", async () => {
+    await liveCharge();
+    const live = await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all();
+    const inside = Date.parse("2026-10-31T22:25Z") / 1000;
+    expect(await rebuildSessions(env.DB, T0 - 3600, inside, await loadSettings(env.DB), env.TIMEZONE)).toBe(1);
+    expect((await env.DB.prepare(`SELECT ${COLUMNS} FROM charge_session`).all()).results).toEqual(live.results);
+  });
   it("COST-4 recompute applies new prices", async () => {
     await liveCharge();
     await env.DB.prepare("UPDATE settings SET value = '20' WHERE key = 'energy_price_c_per_kwh'").run();
@@ -2165,6 +2391,25 @@ describe("session routes", () => {
     expect(list.sessions).toHaveLength(1);
     expect((await route("GET", "/api/sessions?month=bad")).status).toBe(400);
   });
+  const insertSession = (status: string, startedAt: number, month: string) =>
+    env.DB.prepare("INSERT INTO charge_session (status, started_at, local_month, last_sample_at) VALUES (?, ?, ?, ?)").bind(status, startedAt, month, startedAt);
+
+  it("API-4 counts closed sessions only, newest first, at most 24 months", async () => {
+    const month = (i: number) => `${2024 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
+    await env.DB.batch(Array.from({ length: 25 }, (_, i) => insertSession("closed", i + 1, month(i))));
+    await insertSession("open", 100, "2027-01").run();
+    mockFetch(() => new Response("{}"));
+    const { months } = await (await route("GET", "/api/months")).json<{ months: { month: string }[] }>();
+    expect(months).toHaveLength(24);
+    expect(months[0]?.month).toBe("2026-01");
+    expect(months[23]?.month).toBe("2024-02");
+  });
+  it("API-5 lists a month's sessions newest first", async () => {
+    await env.DB.batch([insertSession("closed", 10, "2026-10"), insertSession("closed", 20, "2026-10"), insertSession("closed", 30, "2026-09")]);
+    mockFetch(() => new Response("{}"));
+    const { sessions } = await (await route("GET", "/api/sessions?month=2026-10")).json<{ sessions: { started_at: number }[] }>();
+    expect(sessions.map((s) => s.started_at)).toEqual([20, 10]);
+  });
   it("API-6 recomputes and rebuilds", async () => {
     await liveCharge();
     mockFetch(() => new Response("{}"));
@@ -2180,6 +2425,8 @@ describe("session routes", () => {
   it("API-6 validates the rebuild range", async () => {
     mockFetch(() => new Response("{}"));
     expect((await route("POST", "/api/sessions/rebuild?from=100&to=0")).status).toBe(400);
+    expect((await route("POST", "/api/sessions/rebuild?from=&to=100")).status).toBe(400);
+    expect((await route("POST", "/api/sessions/rebuild?to=100")).status).toBe(400);
   });
 });
 ```
@@ -2486,12 +2733,12 @@ Checked on 2026-10-31 in a scratch project, using exact pinned versions:
 
 | Check | Result |
 |---|---|
-| Rebuilt the project from this file's code blocks and `specs/`, task by task | Passed. Tests, typecheck, spec coverage and deploy dry run were clean after every task. Tests passing at the end of each phase: Phase 0: 1, Phase 1: 55, Phase 2: 89, Phase 3: 97 |
+| Rebuilt the project from this file's code blocks and `specs/`, task by task | Passed. Tests, typecheck, spec coverage and deploy dry run were clean after every task. Tests passing at the end of each phase: Phase 0: 1, Phase 1: 77, Phase 2: 117, Phase 3: 125 |
 | Local run: migrations, `wrangler dev`, static page, health route, cron trigger | Passed |
 | Real Škoda API with a placeholder key | Returned 401, recorded as an `auth` error |
 | Deploy dry run | Passed, about 32 KB gzipped |
 | Local run of `scripts/seed-local.sql` | Passed |
 
-Not tested, because they need real accounts or the car: a valid API key through this Worker, real deployment and Access login, real CPU time, and whether the car's reporting pattern matches the assumptions. Phase 1 exists to check those. The dashboard is specified in `specs/dashboard.md` but not built.
+Not tested, because they need real accounts or the car: a valid API key through this Worker, real deployment and Access login, real CPU time, and whether the car's reporting pattern matches the assumptions. Phase 1 exists to check those.
 
 Sources: [Škoda API docs](https://public.api.connect.skoda-auto.cz/docs), [Škoda OpenAPI spec](https://public.api.connect.skoda-auto.cz/v3/api-docs), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/), [Workers Vitest integration](https://developers.cloudflare.com/workers/testing/vitest-integration/write-your-first-test/), [Validating Access JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/), [Access for Workers](https://developers.cloudflare.com/workers/configuration/cloudflare-access/).
