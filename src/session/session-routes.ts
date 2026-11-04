@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
-import { recomputeCosts, rebuildSessions } from "./maintenance";
-import type { AppEnv } from "./routes";
+import { recomputeCosts, rebuildSessions } from "../maintenance/maintenance";
+import type { AppEnv } from "../routes/routes";
 
 const MONTH = /^\d{4}-\d{2}$/;
 const SECONDS = /^\d+$/;

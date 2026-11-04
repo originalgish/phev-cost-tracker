@@ -1,4 +1,4 @@
-import { ENERGY_PRICE_C_PER_KWH } from "./config";
+import { ENERGY_PRICE_C_PER_KWH } from "../config/config";
 
 export type EnergySource = "power" | "soc";
 

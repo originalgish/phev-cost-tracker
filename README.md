@@ -13,7 +13,7 @@ The tracker polls the Škoda Connect API, turns the car's readings into charge s
 3. **At home.** The parked position is compared with the home position captured once at setup, within 50 m. If the car reports no position, the last known value carries over while it stays plugged in; otherwise it is unknown.
 4. **Session.** A session opens when the car is plugged in, charging and at home. It closes on unplug, when charging ends, or after 180 minutes of silence. Charges away from home are ignored.
 5. **Energy.** Each session gets two estimates: integrated charge power, and the change in SoC times usable battery size. Billed energy uses the power estimate and falls back to SoC if that has gaps.
-6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config.ts](src/config.ts). Costs are stored when a session closes, so a price change is a code change that applies to new sessions.
+6. **Cost.** Billed kWh times the contract's energy price (7.87 c/kWh, VAT included). The price and the other tuning values are constants in [src/config/config.ts](src/config/config.ts). Costs are stored when a session closes, so a price change is a code change that applies to new sessions.
 7. **Alerts.** Optional webhook, for example ntfy.sh. Sent for a key expiring within 14 days, three auth or rate-limit failures in a row, or no successful poll for 6 hours. Each kind is sent at most once a day.
 
 ## Architecture
@@ -37,9 +37,9 @@ The tracker polls the Škoda Connect API, turns the car's readings into charge s
 ## Layout
 
 ```text
-src/            Worker code: poll, gate, session, cost, routes, alerts
+src/            Worker code, one folder per module with its tests
 specs/          behaviour, the source of truth
-test/           Vitest tests; each title names its requirement ID
+src/*/*.test.ts Vitest tests beside the code they cover; each title names its requirement ID (cross-module tests in src/integration/, helpers in src/testing/)
 public/         dashboard
 migrations/     D1 schema
 scripts/        spec checker and local seed data
@@ -117,7 +117,7 @@ This needs a Cloudflare account with Zero Trust enabled and the MyŠkoda app, ve
 5. In the Cloudflare dashboard, open the Worker's **Access** tab and select **Protect this Worker behind Access**. Choose **All traffic** and allow only your own email address.
 6. In **Zero Trust**, find the app under **Access** and **Applications**. Put its Application Audience (AUD) tag and your team domain into `vars` in `wrangler.jsonc`, then deploy again. These values and the `database_id` are identifiers, not secrets, but they are public in this repository.
 7. Open the Worker's URL in a private window and confirm the Access login appears. After logging in, with the car parked at home, run the `/setup/home` call from [Maintenance](#maintenance).
-8. Set your own price and battery size in [src/config.ts](src/config.ts), and add a calendar reminder for the API key's expiry date.
+8. Set your own price and battery size in [src/config/config.ts](src/config/config.ts), and add a calendar reminder for the API key's expiry date.
 
 ## Documentation
 
@@ -132,4 +132,4 @@ This repository is public. The API key, the VIN, raw API output and the home pos
 
 - Energy figures are estimates from the car's readings. The API does not say whether charge power is measured at the wall or the battery. If it is the battery, the true cost is higher than shown, by the charger's losses. A full month compared with the electricity bill settles this (OPS-3).
 - A charge is first seen at the next poll, up to 15 minutes late, so energy before that is not counted.
-- Whether polling a sleeping car affects its 12 V battery is unknown. Watch for `vehicle-not-accepting-requests` in the dashboard's errors, and raise `POLL_INTERVAL_IDLE_MIN` in [src/config.ts](src/config.ts) if it appears.
+- Whether polling a sleeping car affects its 12 V battery is unknown. Watch for `vehicle-not-accepting-requests` in the dashboard's errors, and raise `POLL_INTERVAL_IDLE_MIN` in [src/config/config.ts](src/config/config.ts) if it appears.

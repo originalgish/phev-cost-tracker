@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchVehicle, readMeta } from "../src/skoda";
+import { fetchVehicle, readMeta } from "./skoda";
 
 afterEach(() => vi.restoreAllMocks());
 

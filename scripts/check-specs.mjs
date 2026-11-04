@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 
 const SPEC_DIR = "specs";
-const TEST_DIR = "test";
+const TEST_DIR = "src";
 const ID = /\b(?:POLL|HOME|SES|COST|API|SEC|ALERT|DASH|OPS)-\d+\b/g;
 const HEADING = /^### ([A-Z]+-\d+): .+\n\nPhase: (\d+)\. Verified by: (test|manual)\.$/gm;
 
@@ -24,7 +24,7 @@ for (const file of readdirSync(SPEC_DIR)) {
 }
 
 const covered = new Set();
-for (const file of readdirSync(TEST_DIR)) {
+for (const file of readdirSync(TEST_DIR, { recursive: true })) {
   if (!file.endsWith(".test.ts")) continue;
   const text = readFileSync(`${TEST_DIR}/${file}`, "utf8");
   const titles = text.match(/\b(?:it|describe)(?:\.each\([\s\S]*?\))?\(\s*["'`].*["'`]/g) ?? [];

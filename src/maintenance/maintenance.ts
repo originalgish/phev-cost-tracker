@@ -1,7 +1,7 @@
-import { MAX_GAP_MIN } from "./config";
-import { step, type OpenSession } from "./session";
-import { insertClosed, totalsFor } from "./session-store";
-import type { Sample } from "./sample";
+import { MAX_GAP_MIN } from "../config/config";
+import { step, type OpenSession } from "../session/session";
+import { insertClosed, totalsFor } from "../session/session-store";
+import type { Sample } from "../sample/sample";
 
 type SnapshotRow = {
   captured_at: number;

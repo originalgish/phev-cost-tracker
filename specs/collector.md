@@ -1,6 +1,6 @@
 # Collector
 
-Timing and thresholds below are constants in `src/config.ts`.
+Timing and thresholds below are constants in `src/config/config.ts`.
 
 ### POLL-1: Polling cadence
 

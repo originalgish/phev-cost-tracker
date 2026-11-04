@@ -1,8 +1,8 @@
 import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { recomputeCosts, rebuildSessions } from "../src/maintenance";
-import { pollOnce } from "../src/poll";
-import { T0, authedHeaders, mockApiSequence, mockFetch, resetDb, setHome, vehicleBody } from "./helpers";
+import { recomputeCosts, rebuildSessions } from "./maintenance";
+import { pollOnce } from "../poll/poll";
+import { T0, authedHeaders, mockApiSequence, mockFetch, resetDb, setHome, vehicleBody } from "../testing/helpers";
 
 beforeEach(async () => {
   await resetDb();

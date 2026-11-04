@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { closeIfStale, step, type OpenSession } from "../src/session";
-import type { Sample } from "../src/sample";
+import { closeIfStale, step, type OpenSession } from "./session";
+import type { Sample } from "../sample/sample";
 
 const GAP = 45 * 60;
 const sample = (over: Partial<Sample>): Sample => ({
