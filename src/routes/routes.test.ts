@@ -1,8 +1,8 @@
 import { env, exports } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { app } from "../src/routes";
-import { loadSettings } from "../src/settings";
-import { HOME, apiResponse, authedHeaders, mintToken, mockFetch, resetDb } from "./helpers";
+import { app } from "./routes";
+import { loadSettings } from "../settings/settings";
+import { HOME, apiResponse, authedHeaders, mintToken, mockFetch, resetDb } from "../testing/helpers";
 
 beforeEach(resetDb);
 afterEach(() => vi.restoreAllMocks());

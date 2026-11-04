@@ -1,4 +1,4 @@
-import { loadPollState, type PollStateRow } from "./poll";
+import { loadPollState, type PollStateRow } from "../poll/poll";
 
 const DAY = 86400;
 const KEY_WARNING_SECONDS = 14 * DAY;

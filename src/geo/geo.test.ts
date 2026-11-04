@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { distanceM } from "../src/geo";
+import { distanceM } from "./geo";
 
 it("HOME-1 measures short distances", () => {
   const d = distanceM({ latitude: 60.17, longitude: 24.94 }, { latitude: 60.1704, longitude: 24.94 });

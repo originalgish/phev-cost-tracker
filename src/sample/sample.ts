@@ -1,7 +1,7 @@
-import { HOME_RADIUS_M } from "./config";
-import { distanceM } from "./geo";
-import type { Settings } from "./settings";
-import type { ParkingPosition, VehicleResponse } from "./skoda";
+import { HOME_RADIUS_M } from "../config/config";
+import { distanceM } from "../geo/geo";
+import type { Settings } from "../settings/settings";
+import type { ParkingPosition, VehicleResponse } from "../skoda/skoda";
 
 export type Sample = {
   capturedAt: number; // unix seconds, from charging.carCapturedTimestamp

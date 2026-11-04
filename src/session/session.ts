@@ -1,4 +1,4 @@
-import type { Sample } from "./sample";
+import type { Sample } from "../sample/sample";
 
 export type OpenSession = {
   startedAt: number;

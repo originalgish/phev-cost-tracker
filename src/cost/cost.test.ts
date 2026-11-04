@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseEnergy, kwhBySoc, sessionCostC } from "../src/cost";
+import { chooseEnergy, kwhBySoc, sessionCostC } from "./cost";
 
 describe("COST-1 sessionCostC", () => {
   it("multiplies billed kWh by the contract price", () => expect(sessionCostC(10)).toBeCloseTo(78.7));

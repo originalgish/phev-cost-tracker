@@ -1,10 +1,10 @@
-import { POLL_INTERVAL_IDLE_MIN, POLL_INTERVAL_PLUGGED_MIN } from "./config";
-import { nextNotBefore, shouldPoll } from "./gate";
-import { toSample } from "./sample";
-import { sessionWrites } from "./session-store";
-import { loadSettings } from "./settings";
-import { carStateWrites } from "./vehicle-state";
-import { fetchVehicle, typeSlug, type FetchFailure, type RateMeta } from "./skoda";
+import { POLL_INTERVAL_IDLE_MIN, POLL_INTERVAL_PLUGGED_MIN } from "../config/config";
+import { nextNotBefore, shouldPoll } from "../gate/gate";
+import { toSample } from "../sample/sample";
+import { sessionWrites } from "../session/session-store";
+import { loadSettings } from "../settings/settings";
+import { carStateWrites } from "../vehicle-state/vehicle-state";
+import { fetchVehicle, typeSlug, type FetchFailure, type RateMeta } from "../skoda/skoda";
 
 const POLL_PARTS = ["charging", "fuelStatus", "parkingPosition", "odometer"];
 const ERROR_RETENTION_SECONDS = 30 * 86400;

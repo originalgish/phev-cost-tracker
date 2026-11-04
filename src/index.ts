@@ -1,7 +1,7 @@
-import { runAlerts } from "./alerts";
-import { pollOnce } from "./poll";
-import { app } from "./routes";
-import { registerSessionRoutes } from "./session-routes";
+import { runAlerts } from "./alerts/alerts";
+import { pollOnce } from "./poll/poll";
+import { app } from "./routes/routes";
+import { registerSessionRoutes } from "./session/session-routes";
 
 registerSessionRoutes(app);
 

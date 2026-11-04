@@ -1,4 +1,4 @@
-import type { VehicleResponse } from "./skoda";
+import type { VehicleResponse } from "../skoda/skoda";
 
 type Field = string | number | null;
 type Part = { capturedAt: number | null; data: Record<string, Field> };

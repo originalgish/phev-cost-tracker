@@ -1,6 +1,6 @@
 # Cost
 
-The only price is the fixed-term electricity contract's energy price: 7.87 c/kWh, VAT 25.5 % included, fixed until 2028-02-02. It is a constant in `src/config.ts`, not a setting. The contract has no per-kWh transfer or tax line, and its monthly fee does not depend on charging, so neither is part of session cost.
+The only price is the fixed-term electricity contract's energy price: 7.87 c/kWh, VAT 25.5 % included, fixed until 2028-02-02. It is a constant in `src/config/config.ts`, not a setting. The contract has no per-kWh transfer or tax line, and its monthly fee does not depend on charging, so neither is part of session cost.
 
 ### COST-1: Cost
 

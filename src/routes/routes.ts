@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { rejectCrossSite, requireAccess } from "./auth";
-import { failureWrites, loadPollState, successWrite } from "./poll";
-import { loadSettings } from "./settings";
-import { fetchVehicle } from "./skoda";
+import { rejectCrossSite, requireAccess } from "../auth/auth";
+import { failureWrites, loadPollState, successWrite } from "../poll/poll";
+import { loadSettings } from "../settings/settings";
+import { fetchVehicle } from "../skoda/skoda";
 
 export type AppEnv = { Bindings: Env };
 

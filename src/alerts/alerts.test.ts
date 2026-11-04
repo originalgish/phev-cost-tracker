@@ -1,8 +1,8 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dueAlerts, runAlerts } from "../src/alerts";
-import type { PollStateRow } from "../src/poll";
-import { T0, resetDb } from "./helpers";
+import { dueAlerts, runAlerts } from "./alerts";
+import type { PollStateRow } from "../poll/poll";
+import { T0, resetDb } from "../testing/helpers";
 
 beforeEach(resetDb);
 afterEach(() => vi.restoreAllMocks());

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextNotBefore, shouldPoll } from "../src/gate";
+import { nextNotBefore, shouldPoll } from "./gate";
 
 const gate = { notBefore: null, pluggedIntervalMin: 10, idleIntervalMin: 15 };
 const ok = { failureKind: null, retryAfterSeconds: null, rateRemaining: 10, rateResetSeconds: 100, authFailures: 0 };
