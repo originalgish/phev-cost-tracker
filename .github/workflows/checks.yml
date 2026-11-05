@@ -1,16 +1,11 @@
-name: CI/CD
+name: Checks
 
+# The quality jobs, shared by the pull request and main workflows.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -49,24 +44,3 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - run: pnpm migrate:local
-
-  deploy:
-    needs: [test, typecheck, specs, build, migrations]
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    # Never cancel a deploy halfway through a migration. A newer push waits its turn.
-    concurrency:
-      group: deploy
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup
-      # The token goes only to the steps that use it, so dependency install scripts never see it.
-      - run: pnpm migrate:remote
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      # `pnpm deploy` without `run` is pnpm's own command, not this package's script.
-      - run: pnpm run deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
