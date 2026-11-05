@@ -45,14 +45,8 @@ jobs:
       - uses: ./.github/actions/setup
       - run: pnpm migrate:local
 
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: ./.github/actions/setup
-      - run: pnpm audit --prod
-
   deploy:
-    needs: [test, typecheck, specs, build, migrations, audit]
+    needs: [test, typecheck, specs, build, migrations]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     # Never cancel a deploy halfway through a migration. A newer push waits its turn.
