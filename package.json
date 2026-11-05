@@ -13,14 +13,14 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "hono": "4.13.14",
-    "jose": "6.2.14"
+    "hono": "4.13.16",
+    "jose": "6.2.15"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "1.4.11",
+    "@cloudflare/vitest-plugin": "1.5.0",
     "chart.js": "4.6.1",
     "typescript": "7.0.2",
-    "vitest": "5.0.5",
-    "wrangler": "4.156.0"
+    "vitest": "5.1.0",
+    "wrangler": "4.156.2"
   }
 }
