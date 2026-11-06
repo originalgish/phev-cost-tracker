@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PHEV Cost Tracker</title>
+  <meta name="description" content="Charging cost, energy and sessions for the plug-in hybrid, by month.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
-  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/chart.umd.min.js" defer></script>
   <script src="app.js" type="module"></script>
 </head>
 <body>
@@ -16,60 +17,78 @@
       <a href="/health">Data health</a>
     </header>
 
-    <div id="banners"></div>
     <p id="status" role="status" hidden></p>
 
-    <section class="card">
-      <h2>Car now</h2>
-      <p id="no-car" hidden>No car data yet</p>
-      <div id="car" class="stats">
-        <div class="stat"><span class="label">Combined range</span><span id="car-range" class="value">—</span><span id="car-fuel" class="sub">—</span></div>
-        <div class="stat"><span class="label">Battery</span><span id="car-battery" class="value">—</span><span id="car-charge" class="sub">—</span></div>
-        <div class="stat"><span class="label">Odometer</span><span id="car-odometer" class="value">—</span></div>
-      </div>
-      <p id="car-updated" class="label"></p>
-    </section>
-
-    <section class="card">
-      <p id="charging-now" hidden></p>
-      <div class="month-picker">
-        <label for="month">Month</label>
-        <select id="month"></select>
-      </div>
-      <p id="no-sessions" hidden>No charging sessions yet</p>
-
-      <div id="month-details" hidden>
+    <div id="loading" aria-hidden="true">
+      <div class="card">
+        <div class="skeleton line"></div>
         <div class="stats">
-          <div class="stat"><span class="label">Total cost</span><span id="stat-cost" class="value">—</span></div>
-          <div class="stat"><span class="label">Energy</span><span id="stat-kwh" class="value">—</span></div>
-          <div class="stat"><span class="label">Average price</span><span id="stat-avg" class="value">—</span></div>
-          <div class="stat"><span class="label">Sessions</span><span id="stat-count" class="value">—</span></div>
-        </div>
-
-        <h2>Monthly cost</h2>
-        <div class="chart">
-          <canvas id="chart" role="img" aria-label="Bars of charging cost per month, in euros"></canvas>
-        </div>
-
-        <h2>Sessions</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Start</th>
-                <th>Duration</th>
-                <th>kWh by power</th>
-                <th>kWh by SoC</th>
-                <th>Billed kWh</th>
-                <th>Cost €</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody id="sessions"></tbody>
-          </table>
+          <div class="skeleton stat-box"></div>
+          <div class="skeleton stat-box"></div>
+          <div class="skeleton stat-box"></div>
         </div>
       </div>
-    </section>
+      <div class="card">
+        <div class="skeleton line"></div>
+        <div class="skeleton chart-box"></div>
+      </div>
+    </div>
+
+    <div id="content" hidden>
+      <div id="banners"></div>
+
+      <section class="card">
+        <h2>Car now</h2>
+        <p id="no-car" hidden>No car data yet</p>
+        <div id="car" class="stats">
+          <div class="stat"><span class="label">Combined range</span><span id="car-range" class="value">—</span><span id="car-fuel" class="sub">—</span></div>
+          <div class="stat"><span class="label">Battery</span><span id="car-battery" class="value">—</span><span id="car-charge" class="sub">—</span></div>
+          <div class="stat"><span class="label">Odometer</span><span id="car-odometer" class="value">—</span></div>
+        </div>
+        <p id="car-updated" class="label"></p>
+      </section>
+
+      <section class="card">
+        <p id="charging-now" hidden></p>
+        <div class="month-picker">
+          <label for="month">Month</label>
+          <select id="month"></select>
+        </div>
+        <p id="no-sessions" hidden>No charging sessions yet</p>
+
+        <div id="month-details" hidden>
+          <div class="stats">
+            <div class="stat"><span class="label">Total cost</span><span id="stat-cost" class="value">—</span></div>
+            <div class="stat"><span class="label">Energy</span><span id="stat-kwh" class="value">—</span></div>
+            <div class="stat"><span class="label">Average price</span><span id="stat-avg" class="value">—</span></div>
+            <div class="stat"><span class="label">Sessions</span><span id="stat-count" class="value">—</span></div>
+          </div>
+
+          <h2>Monthly cost</h2>
+          <div class="chart">
+            <canvas id="chart" role="img" aria-label="Bars of charging cost per month, in euros"></canvas>
+          </div>
+
+          <h2>Sessions</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Start</th>
+                  <th>Duration</th>
+                  <th>kWh by power</th>
+                  <th>kWh by SoC</th>
+                  <th>Billed kWh</th>
+                  <th>Cost €</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="sessions"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 </body>
 </html>

@@ -82,3 +82,21 @@ Above the month selector, the page shall show a "Car now" card with what the My 
 The Škoda API offers no consumption averages, so the page shall not show any. With no car state stored, the card shall say "No car data yet".
 
 To check, load the seed data and compare the card with the seed rows of `vehicle_state`.
+
+### DASH-12: Render without waiting for scripts
+
+Phase: 4. Verified by: test.
+
+Neither page shall load a script that blocks the first render. Every `<script>` shall be deferred or a module, so the page shows its markup before Chart.js or app code has loaded.
+
+### DASH-13: Page description
+
+Phase: 4. Verified by: test.
+
+Each page shall have a `<meta name="description">` that says what the page shows.
+
+### DASH-14: Loading placeholder
+
+Phase: 4. Verified by: test.
+
+Until the first data has been shown, the page shall show a placeholder in place of the DASH-1 banners and the cards, then swap it for them in one step, so nothing that was already on screen moves. If a request fails, the cards shall still show, together with the DASH-9 message. To check the shift, run Lighthouse on `http://localhost:8787` with the seed data: Cumulative Layout Shift shall be 0.
