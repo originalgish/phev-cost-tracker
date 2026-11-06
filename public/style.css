@@ -86,6 +86,38 @@ a {
   margin-top: 0.25rem;
 }
 
+.skeleton {
+  background: var(--border);
+  border-radius: 6px;
+  animation: pulse 1.2s ease-in-out infinite alternate;
+}
+
+.skeleton.line {
+  width: 40%;
+  height: 1.1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.skeleton.stat-box {
+  height: 84px;
+}
+
+.skeleton.chart-box {
+  height: 240px;
+}
+
+@keyframes pulse {
+  to {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
 .banner {
   background: var(--banner-bg);
   color: var(--banner-text);

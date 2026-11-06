@@ -34,3 +34,34 @@ describe("DASH-5 charging now", () => {
     expect(line).toBeLessThan(html.indexOf('id="month-details"'));
   });
 });
+
+describe("DASH-12 render without waiting for scripts", () => {
+  it.each(["/", "/health"])("defers every script on %s", async (path) => {
+    const scripts = (await page(path)).match(/<script\b[^>]*>/g) ?? [];
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const tag of scripts) expect(tag).toMatch(/\s(defer\b|type="module")/);
+  });
+});
+
+describe("DASH-13 page description", () => {
+  it.each(["/", "/health"])("has a meta description on %s", async (path) => {
+    expect(await page(path)).toMatch(/<meta name="description" content="[^"]+">/);
+  });
+});
+
+describe("DASH-14 loading placeholder", () => {
+  it("starts with a placeholder and the banners and cards hidden", async () => {
+    const html = await page("/");
+    const content = html.match(/<div id="content"[^>]*>/)?.[0];
+    expect(content).toContain("hidden");
+    const at = (id: string) => html.indexOf(`id="${id}"`);
+    expect(at("loading")).toBeGreaterThan(-1);
+    expect(at("loading")).toBeLessThan(at("content"));
+    expect(at("banners")).toBeGreaterThan(at("content"));
+    expect(at("car")).toBeGreaterThan(at("content"));
+  });
+  it("keeps the error message outside the hidden content, so a failed load can show it", async () => {
+    const html = await page("/");
+    expect(html.indexOf('id="status"')).toBeLessThan(html.indexOf('id="content"'));
+  });
+});

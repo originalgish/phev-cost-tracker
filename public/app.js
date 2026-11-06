@@ -173,4 +173,14 @@ $("month").addEventListener("change", (event) => {
 // Chart colours are read from CSS variables, so the chart is redrawn when the scheme changes.
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => renderChart());
 
-run(refresh);
+// The placeholder and the content swap in one step, so banners appearing above the cards do not push them down.
+async function firstLoad() {
+  try {
+    await refresh();
+  } finally {
+    $("loading").remove();
+    $("content").hidden = false;
+  }
+}
+
+run(firstLoad);
