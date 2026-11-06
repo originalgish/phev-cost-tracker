@@ -112,7 +112,8 @@ function renderStats() {
 function renderChart() {
   chart?.destroy();
   chart = null;
-  if (monthRows.length === 0) return;
+  // A chart drawn while hidden has no size and animates in from the corner, so firstLoad draws it once shown.
+  if (monthRows.length === 0 || $("content").hidden) return;
   const style = getComputedStyle(document.documentElement);
   const color = (name) => style.getPropertyValue(name).trim();
   const recent = monthRows.slice(0, CHART_MONTHS).reverse();
@@ -180,6 +181,7 @@ async function firstLoad() {
   } finally {
     $("loading").remove();
     $("content").hidden = false;
+    renderChart();
   }
 }
 
