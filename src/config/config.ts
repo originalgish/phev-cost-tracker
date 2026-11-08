@@ -8,5 +8,5 @@ export const HOME_RADIUS_M = 50;
 
 export const POLL_INTERVAL_PLUGGED_MIN = 10;
 export const POLL_INTERVAL_IDLE_MIN = 15;
-export const MAX_GAP_MIN = 45;
+export const MAX_GAP_MIN = 90;
 export const SESSION_STALE_MIN = 180;
