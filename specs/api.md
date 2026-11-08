@@ -24,7 +24,7 @@ Removed: there are no editable settings. The home position is set only by `POST 
 
 Phase: 2. Verified by: test.
 
-`GET /api/months` shall return `months`, newest first, at most 24, each with `month`, `sessions`, `kwh` and `cost_c`, counting closed sessions only. A month whose only session is open shall still be listed, so its session can be shown.
+`GET /api/months` shall return `months`, newest first, at most 24, each with `month`, `sessions`, `kwh` and `cost_c`. They shall count every session, using the open session's `kwh_used` and `cost_c` so far from API-5.
 
 ### API-5: Sessions
 

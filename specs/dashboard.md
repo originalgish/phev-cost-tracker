@@ -24,7 +24,7 @@ The page shall offer a month selector, newest first. With no months, it shall sh
 
 Phase: 3. Verified by: manual.
 
-For the selected month, the page shall show total cost in euros, energy in kWh, average price in c/kWh (`cost_c / kwh`) and session count, with `—` for an empty value. With the seed data, October shall show 2.04 € over 2 sessions.
+For the selected month, the page shall show total cost in euros, energy in kWh, average price in c/kWh (`cost_c / kwh`) and session count, with `—` for an empty value. The open session counts with its values so far. With the seed data, October shall show 2.04 € over 2 sessions.
 
 ### DASH-4: Monthly chart
 

@@ -4,13 +4,27 @@ import type { AppEnv } from "../routes/routes";
 import { runningTotals, type CostRow } from "./session-store";
 
 const MONTH = /^\d{4}-\d{2}$/;
+
+type MonthRow = { month: string; sessions: number; kwh: number | null; cost_c: number | null };
+
+const add = (a: number | null, b: number | null): number | null => (a === null && b === null ? null : (a ?? 0) + (b ?? 0));
 const SECONDS = /^\d+$/;
 
 export function registerSessionRoutes(app: Hono<AppEnv>): void {
   app.get("/api/months", async (c) => {
-    const { results } = await c.env.DB.prepare(
-      `SELECT local_month AS month, SUM(status = 'closed') AS sessions, SUM(kwh_used) AS kwh, SUM(cost_c) AS cost_c FROM charge_session GROUP BY local_month ORDER BY local_month DESC LIMIT 24`,
-    ).all();
+    const [{ results }, open] = await Promise.all([
+      c.env.DB.prepare(
+        "SELECT local_month AS month, COUNT(*) AS sessions, SUM(kwh_used) AS kwh, SUM(cost_c) AS cost_c FROM charge_session GROUP BY local_month ORDER BY local_month DESC LIMIT 24",
+      ).all<MonthRow>(),
+      c.env.DB.prepare("SELECT * FROM charge_session WHERE status = 'open'").first<CostRow & { local_month: string }>(),
+    ]);
+    // An open session has no stored totals, so its totals so far are added to its month here.
+    const month = open === null ? undefined : results.find((m) => m.month === open.local_month);
+    if (open !== null && month !== undefined) {
+      const t = runningTotals(open);
+      month.kwh = add(month.kwh, t.kwh_used);
+      month.cost_c = add(month.cost_c, t.cost_c);
+    }
     return c.json({ months: results });
   });
 
