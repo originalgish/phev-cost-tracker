@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { rejectCrossSite, requireAccess } from "../auth/auth";
 import { failureWrites, loadPollState, successWrite } from "../poll/poll";
-import { totalsFor } from "../session/session-store";
+import { runningTotals, type CostRow } from "../session/session-store";
 import { loadSettings } from "../settings/settings";
 import { fetchVehicle } from "../skoda/skoda";
 
@@ -12,12 +12,12 @@ export const app = new Hono<AppEnv>();
 app.use("/api/*", rejectCrossSite, requireAccess);
 app.use("/setup/*", rejectCrossSite, requireAccess);
 
-type OpenRow = { started_at: number; kwh_by_power: number; gap_count: number; start_soc: number | null; end_soc: number | null };
+type OpenRow = CostRow & { started_at: number };
 
-// The cost so far, by the same rules a session is billed by when it closes.
-function openSession({ gap_count, ...o }: OpenRow) {
-  const t = totalsFor(o.kwh_by_power, gap_count, o.start_soc, o.end_soc);
-  return { ...o, kwh_used: t.kwh, kwh_source: t.source, cost_c: t.costC };
+function openSession(row: OpenRow) {
+  const { gap_count, ...o } = row;
+  const { kwh_by_soc, ...t } = runningTotals(row);
+  return { ...o, ...t };
 }
 
 app.get("/api/health", async (c) => {

@@ -71,18 +71,36 @@ describe("session routes", () => {
   it("API-4 counts closed sessions only, newest first, at most 24 months", async () => {
     const month = (i: number) => `${2024 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
     await env.DB.batch(Array.from({ length: 25 }, (_, i) => insertSession("closed", i + 1, month(i))));
-    await insertSession("open", 100, "2027-01").run();
+    await insertSession("open", 100, "2026-01").run();
     mockFetch(() => new Response("{}"));
-    const { months } = await (await route("GET", "/api/months")).json<{ months: { month: string }[] }>();
+    const { months } = await (await route("GET", "/api/months")).json<{ months: { month: string; sessions: number }[] }>();
     expect(months).toHaveLength(24);
-    expect(months[0]?.month).toBe("2026-01");
+    expect(months[0]).toMatchObject({ month: "2026-01", sessions: 1 });
     expect(months[23]?.month).toBe("2024-02");
+  });
+  it("API-4 lists a month whose only session is open", async () => {
+    await env.DB.batch([insertSession("closed", 10, "2026-10"), insertSession("open", 20, "2026-11")]);
+    mockFetch(() => new Response("{}"));
+    const { months } = await (await route("GET", "/api/months")).json<{ months: unknown[] }>();
+    expect(months).toEqual([
+      { month: "2026-11", sessions: 0, kwh: null, cost_c: null },
+      { month: "2026-10", sessions: 1, kwh: null, cost_c: null },
+    ]);
   });
   it("API-5 lists a month's sessions newest first", async () => {
     await env.DB.batch([insertSession("closed", 10, "2026-10"), insertSession("closed", 20, "2026-10"), insertSession("closed", 30, "2026-09")]);
     mockFetch(() => new Response("{}"));
     const { sessions } = await (await route("GET", "/api/sessions?month=2026-10")).json<{ sessions: { started_at: number }[] }>();
     expect(sessions.map((s) => s.started_at)).toEqual([20, 10]);
+  });
+  it("API-5 gives the open session its totals so far", async () => {
+    await env.DB.prepare(
+      "INSERT INTO charge_session (status, started_at, local_month, start_soc, end_soc, last_sample_at, kwh_by_power, gap_count) VALUES ('open', 1, '2026-11', 40, 50, 1, 1.1, 1)",
+    ).run();
+    mockFetch(() => new Response("{}"));
+    const { sessions } = await (await route("GET", "/api/sessions?month=2026-11")).json<{ sessions: Record<string, unknown>[] }>();
+    expect(sessions[0]).toMatchObject({ status: "open", kwh_by_power: 1.1, kwh_by_soc: expect.closeTo(1.97, 6), kwh_used: expect.closeTo(1.97, 6), kwh_source: "soc" });
+    expect(sessions[0]?.cost_c).toBeCloseTo(1.97 * 7.87, 6);
   });
   it("API-6 recomputes and rebuilds", async () => {
     await liveCharge();

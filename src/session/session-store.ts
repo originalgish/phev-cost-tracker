@@ -36,6 +36,14 @@ export function totalsFor(kwhByPower: number, gapCount: number, startSoc: number
   return { bySoc, kwh: choice?.kwh ?? null, source: choice?.source ?? null, costC: choice === null ? null : sessionCostC(choice.kwh) };
 }
 
+export type CostRow = { kwh_by_power: number; gap_count: number; start_soc: number | null; end_soc: number | null };
+
+// The totals of an open session so far, by the same rules it is billed by when it closes.
+export function runningTotals(r: CostRow) {
+  const t = totalsFor(r.kwh_by_power, r.gap_count, r.start_soc, r.end_soc);
+  return { kwh_by_soc: t.bySoc, kwh_used: t.kwh, kwh_source: t.source, cost_c: t.costC };
+}
+
 function closeValues(o: OpenSession): (number | string | null)[] {
   const t = totalsFor(o.kwhByPower, o.gapCount, o.startSoc, o.endSoc);
   return [o.startSoc, o.endSoc, o.lastSampleAt, o.lastPowerKw, o.kwhByPower, o.gapCount, t.bySoc, t.kwh, t.source, t.costC];

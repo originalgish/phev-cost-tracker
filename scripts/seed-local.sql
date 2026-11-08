@@ -7,6 +7,10 @@ VALUES
   ('closed', 1790974800, 1790990000, 'unplugged', '2026-10', 30, 88, 1790990000, 0, 11.3, 0, 11.6, 11.3, 'power', 88.9),
   ('closed', 1791579600, 1791596000, 'charge_ended', '2026-10', 22, 95, 1791596000, 0, 13.9, 2, 14.6, 14.6, 'soc', 114.9);
 
+-- The charge the car is in now, so the open session row can be seen.
+INSERT INTO charge_session (status, started_at, local_month, start_soc, end_soc, last_sample_at, last_power_kw, kwh_by_power, gap_count)
+VALUES ('open', unixepoch() - 7200, strftime('%Y-%m', 'now'), 50, 57, unixepoch() - 120, 2, 1.4, 0);
+
 DELETE FROM vehicle_state;
 INSERT INTO vehicle_state (part, captured_at, data) VALUES
   ('charging', unixepoch() - 120, '{"state":"CHARGING","plug_state":"CONNECTED","power_kw":2,"soc_percent":57,"range_km":54,"target_soc_percent":100,"minutes_to_full":280}'),
