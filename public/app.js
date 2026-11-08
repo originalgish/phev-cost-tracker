@@ -1,4 +1,4 @@
-import { $, api, cells, emptyRow, run, when } from "./common.js";
+import { $, api, cells, dateLabel, emptyRow, monthLabel, run, when } from "./common.js";
 
 const DAY = 86400;
 const HOUR = 3600;
@@ -24,7 +24,7 @@ function renderBanners() {
   const lines = [];
   if (!health.home_set) lines.push("Home position not set. Sessions cannot start.");
   if (health.key_expires_at !== null && health.key_expires_at - now() < 14 * DAY) {
-    lines.push(`API key expires on ${new Date(health.key_expires_at * 1000).toLocaleDateString()}.`);
+    lines.push(`API key expires on ${dateLabel(new Date(health.key_expires_at * 1000))}.`);
   }
   if (health.last_success_at !== null && now() - health.last_success_at > HOUR) {
     lines.push(`No successful poll since ${when(health.last_success_at)}.`);
@@ -122,7 +122,7 @@ function renderChart() {
   chart = new Chart($("chart"), {
     type: "bar",
     data: {
-      labels: recent.map((m) => m.month),
+      labels: recent.map((m) => monthLabel(m.month)),
       datasets: [{ label: "Cost", data: recent.map((m) => (m.cost_c ?? 0) / 100), backgroundColor: color("--cost") }],
     },
     options: {
@@ -141,7 +141,7 @@ async function renderMonths(months) {
   const hasMonths = months.length > 0;
   const picker = $("month");
   picker.disabled = !hasMonths;
-  picker.replaceChildren(...months.map((m) => new Option(m.month, m.month)));
+  picker.replaceChildren(...months.map((m) => new Option(monthLabel(m.month), m.month)));
   $("no-sessions").hidden = hasMonths;
   $("month-details").hidden = !hasMonths;
   if (!hasMonths) {

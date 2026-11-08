@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
+import { dateLabel, monthLabel, when } from "../../public/common.js";
 
 const page = async (path: string) => (await env.ASSETS.fetch(`https://x${path}`)).text();
 
@@ -63,5 +64,18 @@ describe("DASH-14 loading placeholder", () => {
   it("keeps the error message outside the hidden content, so a failed load can show it", async () => {
     const html = await page("/");
     expect(html.indexOf('id="status"')).toBeLessThan(html.indexOf('id="content"'));
+  });
+});
+
+describe("DASH-15 date format", () => {
+  it("shows dates as DD.MM.YYYY", () => {
+    expect(dateLabel(new Date(2026, 10, 8))).toBe("08.11.2026");
+    expect(dateLabel(new Date(2026, 0, 5))).toBe("05.01.2026");
+  });
+  it("shows times as DD.MM.YYYY HH:MM", () => {
+    expect(when(new Date(2026, 10, 8, 9, 5).getTime() / 1000)).toBe("08.11.2026 09:05");
+  });
+  it("shows months as MM.YYYY", () => {
+    expect(monthLabel("2026-11")).toBe("11.2026");
   });
 });

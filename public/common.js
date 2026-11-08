@@ -1,6 +1,18 @@
 export const $ = (id) => document.getElementById(id);
 
-export const when = (sec) => (sec === null ? "—" : new Date(sec * 1000).toLocaleString());
+const pad = (n) => String(n).padStart(2, "0");
+
+// The formats of DASH-15, the same whatever the browser's language.
+export const dateLabel = (d) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+
+export const when = (sec) => {
+  if (sec === null) return "—";
+  const d = new Date(sec * 1000);
+  return `${dateLabel(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// The API sends months as YYYY-MM, and the page shows them as MM.YYYY.
+export const monthLabel = (month) => month.split("-").reverse().join(".");
 
 export async function api(path) {
   let res;
