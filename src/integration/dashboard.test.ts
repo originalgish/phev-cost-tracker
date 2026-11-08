@@ -27,15 +27,6 @@ describe("DASH-8 actions", () => {
   });
 });
 
-describe("DASH-5 charging now", () => {
-  it("has a charging-now line outside the month details, so it shows with no months", async () => {
-    const html = await page("/");
-    const line = html.indexOf('id="charging-now"');
-    expect(line).toBeGreaterThan(-1);
-    expect(line).toBeLessThan(html.indexOf('id="month-details"'));
-  });
-});
-
 describe("DASH-12 render without waiting for scripts", () => {
   it.each(["/", "/health"])("defers every script on %s", async (path) => {
     const scripts = (await page(path)).match(/<script\b[^>]*>/g) ?? [];

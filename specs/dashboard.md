@@ -18,13 +18,13 @@ The page shall show one line for each of these that applies:
 
 Phase: 3. Verified by: manual.
 
-The page shall offer a month selector, newest first. With no months, it shall show "No charging sessions yet" and hide DASH-3, DASH-4 and the session table of DASH-5. The "Charging now" line of DASH-5 is not hidden.
+The page shall offer a month selector, newest first. With no months, it shall show "No charging sessions yet" and hide DASH-3, DASH-4 and the session table of DASH-5.
 
 ### DASH-3: Month stats
 
 Phase: 3. Verified by: manual.
 
-For the selected month, the page shall show total cost in euros, energy in kWh, average price in c/kWh (`cost_c / kwh`) and session count, with `—` for an empty value. With the seed data, October shall show 2.04 € over 2 sessions.
+For the selected month, the page shall show total cost in euros, energy in kWh, average price in c/kWh (`cost_c / kwh`) and session count, with `—` for an empty value. The open session counts with its values so far. With the seed data, October shall show 2.04 € over 2 sessions.
 
 ### DASH-4: Monthly chart
 
@@ -36,7 +36,7 @@ The page shall show bars of `cost_c` in euros for up to 12 months, oldest on the
 
 Phase: 3. Verified by: manual.
 
-The page shall list the month's sessions, newest first, with start, duration, kWh by power, kWh by SoC, billed kWh with its source, and cost in euros. Rows with gaps shall say "gaps in power data". If `open_session` is set, a "Charging now" line with its start time, kWh by power and cost so far in euros shall show above the month selector, whether or not any month exists. It is not a row of the table.
+The page shall list the month's sessions, newest first, with start, duration, kWh by power, kWh by SoC, billed kWh with its source, and cost in euros. Rows with gaps shall say "gaps in power data". The open session shall be a row like the others, with its values so far, its duration up to now, and "charging now" in its notes.
 
 ### DASH-6: Data health
 

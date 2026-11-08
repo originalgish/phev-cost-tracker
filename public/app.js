@@ -74,29 +74,23 @@ function renderCar(car) {
   $("car-updated").textContent = newest > 0 ? `Updated ${when(newest)}` : "";
 }
 
-function renderOpen() {
-  const o = health.open_session;
-  $("charging-now").hidden = !o;
-  if (o) $("charging-now").textContent = `Charging now · since ${when(o.started_at)} · ${kwh(o.kwh_by_power)} kWh by power · ${euros(o.cost_c)} € so far`;
-}
-
-function closedRow(s) {
+function sessionRow(s) {
+  const open = s.status === "open";
+  const notes = [open ? "charging now" : "", s.gap_count > 0 ? "gaps in power data" : ""].filter(Boolean);
   return cells([
     when(s.started_at),
-    s.ended_at === null ? "—" : duration(s.ended_at - s.started_at),
+    open ? duration(now() - s.started_at) : s.ended_at === null ? "—" : duration(s.ended_at - s.started_at),
     kwh(s.kwh_by_power),
     kwh(s.kwh_by_soc),
     s.kwh_used === null ? "—" : `${kwh(s.kwh_used)} (${s.kwh_source})`,
     euros(s.cost_c),
-    s.gap_count > 0 ? "gaps in power data" : "",
+    notes.join(" · "),
   ]);
 }
 
 async function loadSessions(month) {
   const { sessions } = await api(`/api/sessions?month=${month}`);
-  const rows = [];
-  // The open session is shown by renderOpen, so skip its row here.
-  for (const s of sessions) if (s.status === "closed") rows.push(closedRow(s));
+  const rows = sessions.map(sessionRow);
   $("sessions").replaceChildren(...(rows.length > 0 ? rows : [emptyRow("No sessions in this month.", 7)]));
 }
 
@@ -161,7 +155,6 @@ async function refresh() {
   health = h;
   renderCar(car);
   renderBanners();
-  renderOpen();
   await renderMonths(monthData.months);
 }
 

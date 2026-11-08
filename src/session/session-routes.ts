@@ -1,23 +1,38 @@
 import type { Hono } from "hono";
 import { recomputeCosts, rebuildSessions } from "../maintenance/maintenance";
 import type { AppEnv } from "../routes/routes";
+import { runningTotals, type CostRow } from "./session-store";
 
 const MONTH = /^\d{4}-\d{2}$/;
+
+type MonthRow = { month: string; sessions: number; kwh: number | null; cost_c: number | null };
+
+const add = (a: number | null, b: number | null): number | null => (a === null && b === null ? null : (a ?? 0) + (b ?? 0));
 const SECONDS = /^\d+$/;
 
 export function registerSessionRoutes(app: Hono<AppEnv>): void {
   app.get("/api/months", async (c) => {
-    const { results } = await c.env.DB.prepare(
-      `SELECT local_month AS month, COUNT(*) AS sessions, SUM(kwh_used) AS kwh, SUM(cost_c) AS cost_c FROM charge_session WHERE status = 'closed' GROUP BY local_month ORDER BY local_month DESC LIMIT 24`,
-    ).all();
+    const [{ results }, open] = await Promise.all([
+      c.env.DB.prepare(
+        "SELECT local_month AS month, COUNT(*) AS sessions, SUM(kwh_used) AS kwh, SUM(cost_c) AS cost_c FROM charge_session GROUP BY local_month ORDER BY local_month DESC LIMIT 24",
+      ).all<MonthRow>(),
+      c.env.DB.prepare("SELECT * FROM charge_session WHERE status = 'open'").first<CostRow & { local_month: string }>(),
+    ]);
+    // An open session has no stored totals, so its totals so far are added to its month here.
+    const month = open === null ? undefined : results.find((m) => m.month === open.local_month);
+    if (open !== null && month !== undefined) {
+      const t = runningTotals(open);
+      month.kwh = add(month.kwh, t.kwh_used);
+      month.cost_c = add(month.cost_c, t.cost_c);
+    }
     return c.json({ months: results });
   });
 
   app.get("/api/sessions", async (c) => {
     const month = c.req.query("month") ?? "";
     if (!MONTH.test(month)) return c.json({ error: "month must be YYYY-MM" }, 400);
-    const { results } = await c.env.DB.prepare("SELECT * FROM charge_session WHERE local_month = ? ORDER BY started_at DESC").bind(month).all();
-    return c.json({ sessions: results });
+    const { results } = await c.env.DB.prepare("SELECT * FROM charge_session WHERE local_month = ? ORDER BY started_at DESC").bind(month).all<CostRow & { status: string }>();
+    return c.json({ sessions: results.map((s) => (s.status === "open" ? { ...s, ...runningTotals(s) } : s)) });
   });
 
   app.post("/api/sessions/recompute-cost", async (c) => {
