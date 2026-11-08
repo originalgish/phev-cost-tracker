@@ -43,3 +43,9 @@ Phase: 2. Verified by: test.
 Phase: 4. Verified by: test.
 
 `GET /api/vehicle` shall return an object keyed by part name (`charging`, `fuelStatus`, `odometer`). Each value shall be `captured_at` plus the fields of POLL-12 for that part. A part the tracker has never stored shall be absent.
+
+### API-8: Running cost
+
+Phase: 4. Verified by: test.
+
+`open_session` in API-1 shall be `null` when no session is open. Otherwise it shall have `started_at`, `kwh_by_power`, `start_soc`, `end_soc`, and `kwh_used`, `kwh_source` and `cost_c` from COST-1 and COST-2 applied to the session so far.

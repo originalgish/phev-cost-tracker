@@ -79,6 +79,36 @@ describe("API-1 health", () => {
   });
 });
 
+describe("API-8 running cost", () => {
+  const openSession = (kwhByPower: number, gapCount: number) =>
+    env.DB.prepare(
+      "INSERT INTO charge_session (status, started_at, local_month, start_soc, end_soc, last_sample_at, kwh_by_power, gap_count) VALUES ('open', 100, '2026-11', 40, 50, 200, ?, ?)",
+    )
+      .bind(kwhByPower, gapCount)
+      .run();
+  const openOf = async () => (await (await get("/api/health", await authedHeaders())).json<{ open_session: Record<string, unknown> | null }>()).open_session;
+
+  it("is null when no session is open", async () => {
+    mockFetch(() => new Response("{}"));
+    expect(await openOf()).toBeNull();
+  });
+  it("costs the power estimate so far", async () => {
+    mockFetch(() => new Response("{}"));
+    await openSession(2, 0);
+    const o = await openOf();
+    expect(o).toMatchObject({ started_at: 100, kwh_by_power: 2, start_soc: 40, end_soc: 50, kwh_used: 2, kwh_source: "power" });
+    expect(o?.cost_c).toBeCloseTo(15.74, 6);
+  });
+  it("falls back to the SoC estimate when power has gaps", async () => {
+    mockFetch(() => new Response("{}"));
+    await openSession(2, 1);
+    const o = await openOf();
+    expect(o).toMatchObject({ kwh_source: "soc" });
+    expect(o?.kwh_used).toBeCloseTo(1.97, 6);
+    expect(o?.cost_c).toBeCloseTo(1.97 * 7.87, 6);
+  });
+});
+
 describe("API-1 home_set", () => {
   it("is false until the home position is stored, and never exposes it", async () => {
     mockFetch(() => new Response("{}"));

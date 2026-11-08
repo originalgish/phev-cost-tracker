@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { rejectCrossSite, requireAccess } from "../auth/auth";
 import { failureWrites, loadPollState, successWrite } from "../poll/poll";
+import { totalsFor } from "../session/session-store";
 import { loadSettings } from "../settings/settings";
 import { fetchVehicle } from "../skoda/skoda";
 
@@ -11,10 +12,18 @@ export const app = new Hono<AppEnv>();
 app.use("/api/*", rejectCrossSite, requireAccess);
 app.use("/setup/*", rejectCrossSite, requireAccess);
 
+type OpenRow = { started_at: number; kwh_by_power: number; gap_count: number; start_soc: number | null; end_soc: number | null };
+
+// The cost so far, by the same rules a session is billed by when it closes.
+function openSession({ gap_count, ...o }: OpenRow) {
+  const t = totalsFor(o.kwh_by_power, gap_count, o.start_soc, o.end_soc);
+  return { ...o, kwh_used: t.kwh, kwh_source: t.source, cost_c: t.costC };
+}
+
 app.get("/api/health", async (c) => {
   const st = await loadPollState(c.env.DB);
   const { results } = await c.env.DB.prepare("SELECT at, kind, http_status, problem_type FROM poll_error ORDER BY at DESC LIMIT 10").all();
-  const open = await c.env.DB.prepare("SELECT started_at, kwh_by_power, start_soc, end_soc FROM charge_session WHERE status = 'open'").first();
+  const row = await c.env.DB.prepare("SELECT started_at, kwh_by_power, gap_count, start_soc, end_soc FROM charge_session WHERE status = 'open'").first<OpenRow>();
   const settings = await loadSettings(c.env.DB);
   return c.json({
     home_set: settings.homeLat !== null,
@@ -24,7 +33,7 @@ app.get("/api/health", async (c) => {
     not_before: st.not_before,
     key_expires_at: st.key_expires_at,
     rate_limit_remaining: st.rate_limit_remaining,
-    open_session: open,
+    open_session: row === null ? null : openSession(row),
     errors: results,
   });
 });

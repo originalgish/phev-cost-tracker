@@ -77,7 +77,7 @@ function renderCar(car) {
 function renderOpen() {
   const o = health.open_session;
   $("charging-now").hidden = !o;
-  if (o) $("charging-now").textContent = `Charging now · since ${when(o.started_at)} · ${kwh(o.kwh_by_power)} kWh by power`;
+  if (o) $("charging-now").textContent = `Charging now · since ${when(o.started_at)} · ${kwh(o.kwh_by_power)} kWh by power · ${euros(o.cost_c)} € so far`;
 }
 
 function closedRow(s) {
