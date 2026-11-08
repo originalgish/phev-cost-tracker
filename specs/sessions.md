@@ -48,7 +48,7 @@ For each interval between samples, the tracker shall add `(p1 + p2) / 2 × hours
 
 Phase: 2. Verified by: test.
 
-When an interval is longer than 45 minutes or a power value is missing, the tracker shall add no energy for it and shall count one gap.
+When an interval is longer than 90 minutes or a power value is missing, the tracker shall add no energy for it and shall count one gap. While charging, the car reports about once an hour, so a shorter limit would drop most intervals.
 
 ### SES-9: Energy from SoC
 

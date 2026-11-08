@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { closeIfStale, step, type OpenSession } from "./session";
+import { MAX_GAP_MIN } from "../config/config";
 import type { Sample } from "../sample/sample";
 
-const GAP = 45 * 60;
+const GAP = MAX_GAP_MIN * 60;
 const sample = (over: Partial<Sample>): Sample => ({
   capturedAt: 0,
   plugState: "CONNECTED",
@@ -48,6 +49,11 @@ describe("energy", () => {
     const t = closeOf(step(open, sample({ capturedAt: 600, chargeState: "READY_FOR_CHARGING", powerKw: 0 }), GAP));
     expect(t.session.kwhByPower).toBeCloseTo(0.3, 6);
     expect(t.reason).toBe("charge_ended");
+  });
+  it("SES-8 adds energy for a 90-minute interval", () => {
+    const s = updateOf(step(open, sample({ capturedAt: 90 * 60 }), GAP));
+    expect(s.gapCount).toBe(0);
+    expect(s.kwhByPower).toBeCloseTo(5.4, 6);
   });
   it("SES-8 counts a long interval as a gap", () => {
     const s = updateOf(step(open, sample({ capturedAt: GAP + 1 }), GAP));
