@@ -66,7 +66,7 @@ API values shall be set with `textContent`, never `innerHTML`. A failed request 
 
 Phase: 3. Verified by: manual.
 
-Money shall show as `(c / 100).toFixed(2)` and times as `new Date(seconds * 1000).toLocaleString()`. Colours shall be CSS variables on `:root`, with dark values under `prefers-color-scheme: dark`. At 375 px wide, neither page shall scroll sideways, and tables shall scroll inside their own containers.
+Money shall show as `(c / 100).toFixed(2)`. Colours shall be CSS variables on `:root`, with dark values under `prefers-color-scheme: dark`. At 375 px wide, neither page shall scroll sideways, and tables shall scroll inside their own containers.
 
 ### DASH-11: Car now
 
@@ -100,3 +100,9 @@ Each page shall have a `<meta name="description">` that says what the page shows
 Phase: 4. Verified by: test.
 
 Until the first data has been shown, the page shall show a placeholder in place of the DASH-1 banners and the cards, then swap it for them in one step, so nothing that was already on screen moves. If a request fails, the cards shall still show, together with the DASH-9 message. To check the shift, run Lighthouse on `http://localhost:8787` with the seed data: Cumulative Layout Shift shall be 0.
+
+### DASH-15: Date format
+
+Phase: 4. Verified by: test.
+
+Dates shall show as `DD.MM.YYYY`, such as `08.11.2026`, and times as `DD.MM.YYYY HH:MM` in 24-hour time. Both shall use the viewer's time zone and shall not depend on the browser's language. Months shall show as `MM.YYYY`, such as `11.2026`. The month the page sends to the API stays `YYYY-MM`, as API-5 requires.
