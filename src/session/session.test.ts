@@ -33,6 +33,8 @@ describe("SES-1 opening", () => {
     [{ chargeState: null }],
     [{ plugState: "DISCONNECTED" }],
     [{ chargeState: "READY_FOR_CHARGING" }],
+    [{ powerKw: 0 }],
+    [{ powerKw: null }],
   ])("stays closed for %j", (over) => expect(step(null, sample(over), GAP).kind).toBe("none"));
 });
 

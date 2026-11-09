@@ -6,7 +6,7 @@ A sample is one new reading from the car. At most one session can be open.
 
 Phase: 2. Verified by: test.
 
-When no session is open and a sample has plug `CONNECTED`, state `CHARGING` and `at_home` true, the tracker shall open a session at the sample's time. Any other sample shall open nothing, so charges away from home are not recorded.
+When no session is open and a sample has plug `CONNECTED`, state `CHARGING`, power above 0 kW and `at_home` true, the tracker shall open a session at the sample's time. Any other sample shall open nothing, so charges away from home are not recorded. The car can report `CHARGING` at 0 kW for a moment, for example while it waits for a charging timer, and that alone is not a charge.
 
 ### SES-2: Close on unplug
 
