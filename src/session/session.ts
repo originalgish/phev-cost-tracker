@@ -49,7 +49,9 @@ function advance(open: OpenSession, at: number, powerKw: number | null, soc: num
 
 export function step(open: OpenSession | null, s: Sample, maxGapSeconds: number): Transition {
   if (open === null) {
-    if (s.plugState !== "CONNECTED" || s.chargeState !== "CHARGING" || s.atHome !== true) return { kind: "none" };
+    if (s.plugState !== "CONNECTED" || s.chargeState !== "CHARGING" || !(s.powerKw !== null && s.powerKw > 0) || s.atHome !== true) {
+      return { kind: "none" };
+    }
     return {
       kind: "open",
       session: {
